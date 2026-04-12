@@ -1,0 +1,2 @@
+-- Baseline migration
+-- No-op placeholder to initialize Flyway metadata.

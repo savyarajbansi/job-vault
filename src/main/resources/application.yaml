@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: Job-portal
+  datasource:
+    # Override via JOBVAULT_DB_URL/USERNAME/PASSWORD for local dev.
+    url: ${JOBVAULT_DB_URL}
+    username: ${JOBVAULT_DB_USERNAME}
+    password: ${JOBVAULT_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  web:
+    cors:
+      allowed-origins:
+        - http://localhost:5173
+      allowed-methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed-headers:
+        - Authorization
+        - Content-Type
+        - Accept
+        - Origin
+        - X-CSRF-Token
+      allow-credentials: true
+      max-age: 3600
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+jobvault:
+  security:
+    jwt:
+      issuer: JobVault
+      secret: ${JOBVAULT_JWT_SECRET}
+      refresh-hash-secret: ${JOBVAULT_REFRESH_HASH_SECRET:${JOBVAULT_JWT_SECRET}}
+      access-token-minutes: 15
+      refresh-token-days: 30
+      refresh-token-bytes: 64
+      csrf-token-bytes: 32
+      max-sessions: 5
+    cookies:
+      refresh-token-name: refresh_token
+      csrf-token-name: csrf_token
+      same-site: Lax
+      secure: true
+      path: /
