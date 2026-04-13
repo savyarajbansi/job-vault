@@ -52,4 +52,4 @@ jobvault:
       csrf-token-name: csrf_token
       same-site: Lax
       secure: true
-      path: /
+      path: /api/auth

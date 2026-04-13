@@ -8,9 +8,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -33,6 +38,7 @@ public class AuthController {
     private final JwtProperties jwtProperties;
     private final AuthCookieProperties cookieProperties;
     private final AuthCookieService cookieService;
+    private final Set<String> allowedOrigins;
 
     public AuthController(
             UserAccountRepository userAccountRepository,
@@ -42,7 +48,8 @@ public class AuthController {
             TokenGenerator tokenGenerator,
             JwtProperties jwtProperties,
             AuthCookieProperties cookieProperties,
-            AuthCookieService cookieService) {
+            AuthCookieService cookieService,
+            Environment environment) {
         this.userAccountRepository = userAccountRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
@@ -51,6 +58,11 @@ public class AuthController {
         this.jwtProperties = jwtProperties;
         this.cookieProperties = cookieProperties;
         this.cookieService = cookieService;
+        Binder binder = Binder.get(environment);
+        List<String> configuredOrigins = binder
+                .bind("spring.web.cors.allowed-origins", Bindable.listOf(String.class))
+                .orElse(List.of());
+        this.allowedOrigins = normalizeAllowedOrigins(configuredOrigins);
     }
 
     @PostMapping("/auth/login")
@@ -72,23 +84,19 @@ public class AuthController {
         if (refreshToken.isBlank()) {
             throw refreshInvalid("empty_refresh_cookie");
         }
-        String csrfCookie = readCookie(request, cookieProperties.getCsrfTokenName())
-                .orElseThrow(() -> refreshInvalid("missing_csrf_cookie"));
-        if (csrfCookie.isBlank()) {
-            throw refreshInvalid("empty_csrf_cookie");
-        }
-        String csrfHeader = Optional.ofNullable(request.getHeader(AuthCookieService.CSRF_HEADER))
-                .orElseThrow(() -> refreshInvalid("missing_csrf_header"));
-        if (!csrfCookie.equals(csrfHeader)) {
-            throw refreshInvalid("csrf_mismatch");
-        }
+        validateCsrfDoubleSubmit(request);
+        validateOriginAndReferer(request);
         RefreshTokenRotation rotation = refreshTokenService.rotateRefreshToken(refreshToken);
         AuthTokensResponse responseBody = issueTokens(rotation.user(), response, rotation.refreshToken());
         return ResponseEntity.ok(responseBody);
     }
 
     @PostMapping("/auth/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal JwtPrincipal principal, HttpServletResponse response) {
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal JwtPrincipal principal,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        validateCsrfDoubleSubmit(request);
+        validateOriginAndReferer(request);
         UserAccount user = requireUser(principal);
         refreshTokenService.revokeAllTokens(user);
         cookieService.clearRefreshTokenCookie(response);
@@ -169,5 +177,63 @@ public class AuthController {
                 AuthErrorCodes.MESSAGE_REFRESH_INVALID,
                 HttpStatus.UNAUTHORIZED,
                 Map.of("reason", reason));
+    }
+
+    private void validateCsrfDoubleSubmit(HttpServletRequest request) {
+        String csrfCookie = readCookie(request, cookieProperties.getCsrfTokenName())
+                .orElseThrow(() -> refreshInvalid("missing_csrf_cookie"));
+        if (csrfCookie.isBlank()) {
+            throw refreshInvalid("empty_csrf_cookie");
+        }
+        String csrfHeader = Optional.ofNullable(request.getHeader(AuthCookieService.CSRF_HEADER))
+                .orElseThrow(() -> refreshInvalid("missing_csrf_header"));
+        if (!csrfCookie.equals(csrfHeader)) {
+            throw refreshInvalid("csrf_mismatch");
+        }
+    }
+
+    private void validateOriginAndReferer(HttpServletRequest request) {
+        String origin = normalizeHeader(request.getHeader("Origin"));
+        String referer = normalizeHeader(request.getHeader("Referer"));
+        if (origin == null && referer == null) {
+            throw refreshInvalid("missing_origin_or_referer");
+        }
+        if (origin != null && !allowedOrigins.contains(origin)) {
+            throw refreshInvalid("invalid_origin");
+        }
+        if (referer != null && !isAllowedReferer(referer)) {
+            throw refreshInvalid("invalid_referer");
+        }
+    }
+
+    private boolean isAllowedReferer(String referer) {
+        for (String allowedOrigin : allowedOrigins) {
+            if (referer.equals(allowedOrigin) || referer.startsWith(allowedOrigin + "/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeHeader(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Set<String> normalizeAllowedOrigins(List<String> configuredOrigins) {
+        if (configuredOrigins == null) {
+            return Set.of();
+        }
+        Set<String> origins = new LinkedHashSet<>();
+        for (String configuredOrigin : configuredOrigins) {
+            String normalized = normalizeHeader(configuredOrigin);
+            if (normalized != null) {
+                origins.add(normalized);
+            }
+        }
+        return origins;
     }
 }

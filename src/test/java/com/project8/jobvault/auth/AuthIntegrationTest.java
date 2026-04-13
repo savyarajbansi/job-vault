@@ -43,10 +43,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,13 +67,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "jobvault.security.cookies.csrf-token-name=csrf_token",
         "jobvault.security.cookies.same-site=Lax",
         "jobvault.security.cookies.secure=true",
-        "jobvault.security.cookies.path=/"
+        "jobvault.security.cookies.path=/api/auth"
 })
 @Import(AuthIntegrationTest.TestConfig.class)
 class AuthIntegrationTest {
 
     private static final String REFRESH_COOKIE = "refresh_token";
     private static final String CSRF_COOKIE = "csrf_token";
+    private static final String FRONTEND_ORIGIN = "http://localhost:5173";
 
     @Autowired
     private MockMvc mockMvc;
@@ -94,16 +96,36 @@ class AuthIntegrationTest {
 
     private final ConcurrentMap<UUID, RefreshToken> tokenStore = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UUID> tokenHashIndex = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, UserAccount> userByEmail = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UserAccount> userById = new ConcurrentHashMap<>();
 
-    private UserAccount user;
+    private UserAccount seekerUser;
+    private UserAccount employerUser;
+    private UserAccount adminUser;
 
     @BeforeEach
     void setUp() {
         tokenStore.clear();
         tokenHashIndex.clear();
-        user = buildUser();
-        when(userAccountRepository.findByEmail(eq("user@example.com"))).thenReturn(Optional.of(user));
-        when(userAccountRepository.findById(eq(user.getId()))).thenReturn(Optional.of(user));
+        userByEmail.clear();
+        userById.clear();
+
+        seekerUser = buildUser("user@example.com", "JOB_SEEKER");
+        employerUser = buildUser("employer@example.com", "EMPLOYER");
+        adminUser = buildUser("admin@example.com", "ADMIN");
+
+        indexUser(seekerUser);
+        indexUser(employerUser);
+        indexUser(adminUser);
+
+        when(userAccountRepository.findByEmail(anyString())).thenAnswer(invocation -> {
+            String email = invocation.getArgument(0);
+            return Optional.ofNullable(userByEmail.get(email));
+        });
+        when(userAccountRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+            UUID userId = invocation.getArgument(0);
+            return Optional.ofNullable(userById.get(userId));
+        });
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> {
             RefreshToken token = invocation.getArgument(0);
             if (token.getId() == null) {
@@ -155,6 +177,21 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void loginRejectsInvalidPayloadWithConsistentError() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.message")
+                        .value("Invalid or expired token, or invalid authentication credentials/request payload."))
+                .andExpect(jsonPath("$.details.reason").value("validation_failed"))
+                .andExpect(jsonPath("$.details.fields.email").isNotEmpty())
+                .andExpect(jsonPath("$.details.fields.password").isNotEmpty())
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
     void refreshRotatesTokenAndRejectsReuse() throws Exception {
         MvcResult loginResult = performLogin();
         String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE);
@@ -162,7 +199,9 @@ class AuthIntegrationTest {
 
         MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh")
                 .cookie(TestCookies.cookie(REFRESH_COOKIE, refreshToken), TestCookies.cookie(CSRF_COOKIE, csrfToken))
-                .header("X-CSRF-Token", csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andReturn();
@@ -172,9 +211,40 @@ class AuthIntegrationTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                 .cookie(TestCookies.cookie(REFRESH_COOKIE, refreshToken), TestCookies.cookie(CSRF_COOKIE, csrfToken))
-                .header("X-CSRF-Token", csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_003"));
+    }
+
+    @Test
+    void refreshRejectsForgedTokenWithErrAuth003() throws Exception {
+        MvcResult loginResult = performLogin();
+        String csrfToken = extractCookieValue(loginResult, CSRF_COOKIE);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(TestCookies.cookie(REFRESH_COOKIE, "forged-refresh-token"),
+                        TestCookies.cookie(CSRF_COOKIE, csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_003"));
+    }
+
+    @Test
+    void refreshRejectsWhenOriginAndRefererMissing() throws Exception {
+        MvcResult loginResult = performLogin();
+        String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE);
+        String csrfToken = extractCookieValue(loginResult, CSRF_COOKIE);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(TestCookies.cookie(REFRESH_COOKIE, refreshToken), TestCookies.cookie(CSRF_COOKIE, csrfToken))
+                .header("X-CSRF-Token", csrfToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_003"))
+                .andExpect(jsonPath("$.details.reason").value("missing_origin_or_referer"));
     }
 
     @Test
@@ -197,8 +267,35 @@ class AuthIntegrationTest {
         mockMvc.perform(get("/api/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(user.getId().toString()))
+                .andExpect(jsonPath("$.id").value(seekerUser.getId().toString()))
                 .andExpect(jsonPath("$.roles[0]").value("JOB_SEEKER"));
+    }
+
+    @Test
+    void roleProtectedEndpointsAllowMatchingRoleAndDenyMismatchedRole() throws Exception {
+        String seekerAccessToken = extractAccessToken(performLogin("user@example.com"));
+        String employerAccessToken = extractAccessToken(performLogin("employer@example.com"));
+        String adminAccessToken = extractAccessToken(performLogin("admin@example.com"));
+
+        mockMvc.perform(get("/api/admin/test")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + seekerAccessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.details.reason").value("insufficient_role"));
+
+        mockMvc.perform(get("/api/admin/test")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/employer/test")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + seekerAccessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.details.reason").value("insufficient_role"));
+
+        mockMvc.perform(get("/api/employer/test")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + employerAccessToken))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -209,6 +306,10 @@ class AuthIntegrationTest {
         String csrfToken = extractCookieValue(loginResult, CSRF_COOKIE);
 
         MvcResult logoutResult = mockMvc.perform(post("/api/auth/logout")
+                .cookie(TestCookies.cookie(CSRF_COOKIE, csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isNoContent())
                 .andReturn();
@@ -220,7 +321,38 @@ class AuthIntegrationTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                 .cookie(TestCookies.cookie(REFRESH_COOKIE, refreshToken), TestCookies.cookie(CSRF_COOKIE, csrfToken))
-                .header("X-CSRF-Token", csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_003"));
+    }
+
+    @Test
+    void logoutRejectsMissingCsrfWithErrAuth003() throws Exception {
+        MvcResult loginResult = performLogin();
+        String accessToken = extractAccessToken(loginResult);
+        String csrfToken = extractCookieValue(loginResult, CSRF_COOKIE);
+
+        mockMvc.perform(post("/api/auth/logout")
+                .cookie(TestCookies.cookie(CSRF_COOKIE, csrfToken))
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Referer", FRONTEND_ORIGIN + "/auth")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_003"));
+    }
+
+    @Test
+    void logoutRejectsWhenOriginAndRefererMissingWithErrAuth003() throws Exception {
+        MvcResult loginResult = performLogin();
+        String accessToken = extractAccessToken(loginResult);
+        String csrfToken = extractCookieValue(loginResult, CSRF_COOKIE);
+
+        mockMvc.perform(post("/api/auth/logout")
+                .cookie(TestCookies.cookie(CSRF_COOKIE, csrfToken))
+                .header("X-CSRF-Token", csrfToken)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_003"));
     }
@@ -252,10 +384,25 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_002"));
     }
 
+    @Test
+    void corsPreflightAllowsLocalFrontendOriginWithCredentials() throws Exception {
+        mockMvc.perform(options("/api/me")
+                .header("Origin", FRONTEND_ORIGIN)
+                .header("Access-Control-Request-Method", "GET")
+                .header("Access-Control-Request-Headers", "Authorization,X-CSRF-Token"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND_ORIGIN))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
     private MvcResult performLogin() throws Exception {
+        return performLogin("user@example.com");
+    }
+
+    private MvcResult performLogin(String email) throws Exception {
         return mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"user@example.com\",\"password\":\"password\"}"))
+                .content("{\"email\":\"" + email + "\",\"password\":\"password\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.accessTokenExpiresAt").isNotEmpty())
@@ -288,13 +435,18 @@ class AuthIntegrationTest {
         return false;
     }
 
-    private UserAccount buildUser() {
+    private void indexUser(UserAccount account) {
+        userByEmail.put(account.getEmail(), account);
+        userById.put(account.getId(), account);
+    }
+
+    private UserAccount buildUser(String email, String roleName) {
         Role role = new TestRole();
-        role.setName("JOB_SEEKER");
+        role.setName(roleName);
 
         UserAccount account = new TestUserAccount();
         account.setId(UUID.randomUUID());
-        account.setEmail("user@example.com");
+        account.setEmail(email);
         account.setPasswordHash(passwordEncoder.encode("password"));
         account.getRoles().add(role);
         account.setEnabled(true);
@@ -315,6 +467,20 @@ class AuthIntegrationTest {
             @GetMapping("/protected")
             Map<String, String> protectedEndpoint() {
                 return Map.of("status", "ok");
+            }
+        }
+
+        @RestController
+        @RequestMapping("/api")
+        static class RoleProtectedTestEndpoints {
+            @GetMapping("/admin/test")
+            Map<String, String> adminEndpoint() {
+                return Map.of("status", "admin-ok");
+            }
+
+            @GetMapping("/employer/test")
+            Map<String, String> employerEndpoint() {
+                return Map.of("status", "employer-ok");
             }
         }
     }
