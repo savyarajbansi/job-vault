@@ -16,6 +16,7 @@ agent-plan*
 secrets/
 keys/
 .github/agents/
+*.agent.md
 
 ### STS ###
 .apt_generated
