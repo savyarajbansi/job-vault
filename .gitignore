@@ -7,6 +7,16 @@ target/
 # Local overrides
 application-local.yaml
 
+# Agent artifacts
+agent_logs/
+agent-plan*
+*.plan
+*.log
+*.secret
+secrets/
+keys/
+.github/agents/
+
 ### STS ###
 .apt_generated
 .classpath
