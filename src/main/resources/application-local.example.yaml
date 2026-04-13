@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    # Local dev defaults for JobVault
+    url: jdbc:postgresql://localhost:5432/jobvault
+    username: YOUR_DB_USERNAME
+    password: YOUR_DB_PASSWORD
+    driver-class-name: org.postgresql.Driver
