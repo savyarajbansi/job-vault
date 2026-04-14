@@ -21,6 +21,10 @@ keys/
 .github/agents/
 *.agent.md
 
+# Documentation artifacts (local-only)
+/docs/plan/
+/docs/PRD.yaml
+
 ### STS ###
 .apt_generated
 .classpath
