@@ -37,6 +37,8 @@ spring:
       max-request-size: 12MB
 
 jobvault:
+  storage:
+    resumes-dir: ${JOBVAULT_RESUMES_DIR:storage/resumes}
   security:
     jwt:
       issuer: JobVault

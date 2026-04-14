@@ -28,56 +28,60 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties({ JwtProperties.class, AuthCookieProperties.class })
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            JsonAuthenticationEntryPoint authenticationEntryPoint,
-            JsonAccessDeniedHandler accessDeniedHandler) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-                .cors(Customizer.withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/employer/**").hasRole("EMPLOYER")
-                        .requestMatchers("/api/seeker/**").hasRole("JOB_SEEKER")
-                        .anyRequest().authenticated())
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
-    }
+        @Bean
+        public SecurityFilterChain securityFilterChain(
+                        HttpSecurity http,
+                        JwtAuthenticationFilter jwtAuthenticationFilter,
+                        JsonAuthenticationEntryPoint authenticationEntryPoint,
+                        JsonAccessDeniedHandler accessDeniedHandler) throws Exception {
+                http.csrf(csrf -> csrf.disable())
+                                .cors(Customizer.withDefaults())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
+                                                .requestMatchers(HttpMethod.POST, "/api/auth/login",
+                                                                "/api/auth/refresh")
+                                                .permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
+                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/api/employer/**").hasRole("EMPLOYER")
+                                                .requestMatchers("/api/seeker/**").hasRole("JOB_SEEKER")
+                                                .anyRequest().authenticated())
+                                .exceptionHandling(exceptions -> exceptions
+                                                .authenticationEntryPoint(authenticationEntryPoint)
+                                                .accessDeniedHandler(accessDeniedHandler))
+                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                return http.build();
+        }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource(Environment environment) {
-        Binder binder = Binder.get(environment);
-        CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOrigins(binder
-                .bind("spring.web.cors.allowed-origins", Bindable.listOf(String.class))
-                .orElse(List.of()));
-        cors.setAllowedMethods(binder
-                .bind("spring.web.cors.allowed-methods", Bindable.listOf(String.class))
-                .orElse(List.of()));
-        cors.setAllowedHeaders(binder
-                .bind("spring.web.cors.allowed-headers", Bindable.listOf(String.class))
-                .orElse(List.of()));
-        cors.setAllowCredentials(binder.bind("spring.web.cors.allow-credentials", Boolean.class).orElse(false));
-        cors.setMaxAge(binder.bind("spring.web.cors.max-age", Long.class).orElse(1800L));
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", cors);
-        return source;
-    }
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource(Environment environment) {
+                Binder binder = Binder.get(environment);
+                CorsConfiguration cors = new CorsConfiguration();
+                cors.setAllowedOrigins(binder
+                                .bind("spring.web.cors.allowed-origins", Bindable.listOf(String.class))
+                                .orElse(List.of()));
+                cors.setAllowedMethods(binder
+                                .bind("spring.web.cors.allowed-methods", Bindable.listOf(String.class))
+                                .orElse(List.of()));
+                cors.setAllowedHeaders(binder
+                                .bind("spring.web.cors.allowed-headers", Bindable.listOf(String.class))
+                                .orElse(List.of()));
+                cors.setAllowCredentials(binder.bind("spring.web.cors.allow-credentials", Boolean.class).orElse(false));
+                cors.setMaxAge(binder.bind("spring.web.cors.max-age", Long.class).orElse(1800L));
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                source.registerCorsConfiguration("/api/**", cors);
+                return source;
+        }
 
-    @Bean
-    public Clock clock() {
-        return Clock.systemUTC();
-    }
+        @Bean
+        public Clock clock() {
+                return Clock.systemUTC();
+        }
 }

@@ -7,6 +7,9 @@ target/
 # Local overrides
 application-local.yaml
 
+# Local resume storage
+storage/
+
 # Agent artifacts
 agent_logs/
 agent-plan*
