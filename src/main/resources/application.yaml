@@ -12,7 +12,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
-  web:
+  mvc:
     cors:
       allowed-origins:
         - http://localhost:5173

@@ -2,6 +2,6 @@ package com.project8.jobvault.jobs;
 
 public enum JobStatus {
     DRAFT,
-    PUBLISHED,
+    ACTIVE,
     DISABLED
 }

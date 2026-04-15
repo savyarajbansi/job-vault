@@ -7,6 +7,7 @@ import com.project8.jobvault.resumes.UploadErrorException;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -26,8 +27,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(AuthErrorException.class)
     public ResponseEntity<ApiError> handleAuthError(AuthErrorException ex) {
-        ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), ex.getDetails(), clock.instant());
-        return ResponseEntity.status(ex.getStatus()).body(error);
+        ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), detailsOrEmpty(ex.getDetails()), clock.instant());
+        return ResponseEntity.status(resolveStatus(ex.getStatus())).body(error);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
@@ -35,15 +36,15 @@ public class ApiExceptionHandler {
         ApiError error = ApiError.of(
                 AuthErrorCodes.INVALID_TOKEN,
                 AuthErrorCodes.MESSAGE_INVALID_TOKEN,
-                null,
+                Map.of(),
                 clock.instant());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 
     @ExceptionHandler(UploadErrorException.class)
     public ResponseEntity<ApiError> handleUploadError(UploadErrorException ex) {
-        ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), ex.getDetails(), clock.instant());
-        return ResponseEntity.status(ex.getStatus()).body(error);
+        ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), detailsOrEmpty(ex.getDetails()), clock.instant());
+        return ResponseEntity.status(resolveStatus(ex.getStatus())).body(error);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -77,5 +78,14 @@ public class ApiExceptionHandler {
                 details,
                 clock.instant());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    private Map<String, Object> detailsOrEmpty(Map<String, Object> details) {
+        return details == null ? Map.of() : details;
+    }
+
+    private int resolveStatus(HttpStatus status) {
+        HttpStatus resolved = status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status;
+        return Objects.requireNonNull(resolved, "status").value();
     }
 }

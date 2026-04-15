@@ -13,7 +13,7 @@ class StatusEnumsTest {
 
     @Test
     void jobStatusIncludesLifecycleStates() {
-        for (String name : List.of("DRAFT", "PUBLISHED", "DISABLED")) {
+        for (String name : List.of("DRAFT", "ACTIVE", "DISABLED")) {
             assertNotNull(JobStatus.valueOf(name));
         }
     }

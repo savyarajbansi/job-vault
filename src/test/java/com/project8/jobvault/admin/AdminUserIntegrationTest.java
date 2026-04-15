@@ -2,6 +2,11 @@ package com.project8.jobvault.admin;
 
 import com.project8.jobvault.auth.JwtTokenService;
 import com.project8.jobvault.auth.RefreshTokenRepository;
+import com.project8.jobvault.applications.JobApplicationRepository;
+import com.project8.jobvault.notifications.NotificationRepository;
+import com.project8.jobvault.jobs.JobRepository;
+import com.project8.jobvault.resumes.ResumeMetadataRepository;
+import com.project8.jobvault.resumes.ResumeStorageService;
 import com.project8.jobvault.users.Role;
 import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
@@ -14,18 +19,17 @@ import java.util.concurrent.ConcurrentMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.mockito.ArgumentMatchers;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.lang.NonNull;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -61,14 +65,29 @@ class AdminUserIntegrationTest {
     @Autowired
     private JwtTokenService jwtTokenService;
 
-    @MockBean
+    @MockitoBean
     private UserAccountRepository userAccountRepository;
 
-    @MockBean
+    @MockitoBean
     private RoleRepository roleRepository;
 
-    @MockBean
+    @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
+
+    @MockitoBean
+    private JobRepository jobRepository;
+
+    @MockitoBean
+    private NotificationRepository notificationRepository;
+
+    @MockitoBean
+    private JobApplicationRepository jobApplicationRepository;
+
+    @MockitoBean
+    private ResumeMetadataRepository resumeMetadataRepository;
+
+    @MockitoBean
+    private ResumeStorageService resumeStorageService;
 
     private final ConcurrentMap<UUID, UserAccount> usersById = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Role> rolesByName = new ConcurrentHashMap<>();
@@ -101,11 +120,11 @@ class AdminUserIntegrationTest {
         when(userAccountRepository.findAllByOrderByEmailAsc()).thenAnswer(invocation -> usersById.values().stream()
                 .sorted(Comparator.comparing(UserAccount::getEmail))
                 .toList());
-        when(userAccountRepository.findWithRolesById(any(UUID.class))).thenAnswer(invocation -> {
+        when(userAccountRepository.findWithRolesById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             return Optional.ofNullable(usersById.get(userId));
         });
-        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> {
+        when(userAccountRepository.save(nonNullArgument())).thenAnswer(invocation -> {
             UserAccount user = invocation.getArgument(0);
             usersById.put(user.getId(), user);
             return user;
@@ -130,7 +149,7 @@ class AdminUserIntegrationTest {
     void adminCanDisableUser() throws Exception {
         mockMvc.perform(patch("/api/admin/users/{id}/enabled", seekerUser.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(adminUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"enabled\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false));
@@ -142,10 +161,10 @@ class AdminUserIntegrationTest {
     void adminCanAssignRole() throws Exception {
         mockMvc.perform(post("/api/admin/users/{id}/roles", seekerUser.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(adminUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"role\":\"EMPLOYER\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roles", hasItem("EMPLOYER")));
+                .andExpect(jsonPath("$.roles[?(@ == 'EMPLOYER')]").isNotEmpty());
     }
 
     @Test
@@ -153,7 +172,7 @@ class AdminUserIntegrationTest {
         mockMvc.perform(delete("/api/admin/users/{id}/roles/{role}", employerUser.getId(), "EMPLOYER")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(adminUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roles", not(hasItem("EMPLOYER"))));
+                .andExpect(jsonPath("$.roles[?(@ == 'EMPLOYER')]").isEmpty());
     }
 
     @Test
@@ -190,6 +209,12 @@ class AdminUserIntegrationTest {
         account.getRoles().add(role);
         account.setEnabled(true);
         return account;
+    }
+
+    @NonNull
+    @SuppressWarnings("null")
+    private static <T> T nonNullArgument() {
+        return ArgumentMatchers.notNull();
     }
 
     static final class TestRole extends Role {

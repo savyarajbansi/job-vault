@@ -3,6 +3,7 @@ package com.project8.jobvault.auth;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -58,16 +59,37 @@ public class AuthCookieService {
     }
 
     private ResponseCookie buildCookie(String name, String value, boolean httpOnly, Instant expiresAt) {
-        Duration maxAge = Duration.between(clock.instant(), expiresAt);
+        String cookieName = Objects.requireNonNull(requireConfigValue(name, "cookie name"), "cookie name");
+        String sameSite = requireConfigValue(properties.getSameSite(), "jobvault.security.cookies.same-site");
+        String path = requireConfigValue(properties.getPath(), "jobvault.security.cookies.path");
+        Instant effectiveExpiresAt = requireExpiresAt(expiresAt);
+        String cookieValue = value == null ? "" : value;
+        Duration maxAge = Objects.requireNonNull(
+                Duration.between(clock.instant(), effectiveExpiresAt),
+                "maxAge");
         if (maxAge.isNegative()) {
             maxAge = Duration.ZERO;
         }
-        return ResponseCookie.from(name, value)
+        return ResponseCookie.from(cookieName, cookieValue)
                 .httpOnly(httpOnly)
                 .secure(properties.isSecure())
-                .path(properties.getPath())
-                .sameSite(properties.getSameSite())
-                .maxAge(maxAge)
+                .path(path)
+                .sameSite(sameSite)
+                .maxAge(Objects.requireNonNull(maxAge, "maxAge"))
                 .build();
+    }
+
+    private String requireConfigValue(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Missing cookie configuration: " + name);
+        }
+        return value;
+    }
+
+    private Instant requireExpiresAt(Instant expiresAt) {
+        if (expiresAt == null) {
+            throw new IllegalStateException("Cookie expiresAt must not be null");
+        }
+        return expiresAt;
     }
 }

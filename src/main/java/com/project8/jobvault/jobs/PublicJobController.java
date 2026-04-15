@@ -20,7 +20,7 @@ public class PublicJobController {
 
     @GetMapping
     public List<JobSummaryResponse> listPublished() {
-        return jobRepository.findAllByStatusOrderByCreatedAtDesc(JobStatus.PUBLISHED).stream()
+        return jobRepository.findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE).stream()
                 .map(job -> new JobSummaryResponse(
                         job.getId(),
                         job.getTitle(),
@@ -31,7 +31,7 @@ public class PublicJobController {
 
     @GetMapping("/{jobId}")
     public ResponseEntity<JobDetailResponse> getPublished(@PathVariable UUID jobId) {
-        Optional<Job> job = jobRepository.findByIdAndStatus(jobId, JobStatus.PUBLISHED);
+        Optional<Job> job = jobRepository.findByIdAndStatus(jobId, JobStatus.ACTIVE);
         return job.map(value -> ResponseEntity.ok(new JobDetailResponse(
                 value.getId(),
                 value.getTitle(),

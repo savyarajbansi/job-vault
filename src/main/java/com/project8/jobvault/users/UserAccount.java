@@ -34,6 +34,9 @@ public class UserAccount {
     @Column(name = "display_name", length = 200)
     private String displayName;
 
+    @Column(name = "preferred_sector", length = 100)
+    private String preferredSector;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -46,11 +49,7 @@ public class UserAccount {
     private Instant updatedAt;
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
+    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
     protected UserAccount() {
@@ -86,6 +85,14 @@ public class UserAccount {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getPreferredSector() {
+        return preferredSector;
+    }
+
+    public void setPreferredSector(String preferredSector) {
+        this.preferredSector = preferredSector;
     }
 
     public boolean isEnabled() {

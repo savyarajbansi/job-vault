@@ -6,6 +6,7 @@ import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -94,7 +95,7 @@ public class EmployerJobController {
         if (job.getStatus() != JobStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not in DRAFT");
         }
-        job.setStatus(JobStatus.PUBLISHED);
+        job.setStatus(JobStatus.ACTIVE);
         job.setPublishedAt(clock.instant());
         Job saved = jobRepository.save(job);
         return ResponseEntity.ok(toDetail(saved));
@@ -110,8 +111,8 @@ public class EmployerJobController {
             return ResponseEntity.notFound().build();
         }
         Job job = ownedJob.get();
-        if (job.getStatus() != JobStatus.PUBLISHED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not PUBLISHED");
+        if (job.getStatus() != JobStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not ACTIVE");
         }
         job.setStatus(JobStatus.DISABLED);
         job.setDisabledAt(clock.instant());
@@ -120,16 +121,25 @@ public class EmployerJobController {
     }
 
     private Optional<Job> findOwned(UUID jobId, UUID employerId) {
-        return jobRepository.findById(jobId)
+        if (jobId == null || employerId == null) {
+            return Optional.empty();
+        }
+        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
+        UUID resolvedEmployerId = Objects.requireNonNull(employerId, "employerId");
+        return jobRepository.findById(resolvedJobId)
                 .filter(job -> job.getEmployer() != null)
-                .filter(job -> employerId.equals(job.getEmployer().getId()));
+                .filter(job -> resolvedEmployerId.equals(job.getEmployer().getId()));
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
-        return userAccountRepository.findById(principal.userId())
+        UUID userId = principal.userId();
+        if (userId == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
     }

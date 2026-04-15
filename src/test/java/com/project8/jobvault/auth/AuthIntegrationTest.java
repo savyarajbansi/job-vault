@@ -23,7 +23,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.ArgumentMatchers;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.lang.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
@@ -41,7 +43,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -88,10 +89,10 @@ class AuthIntegrationTest {
     @Autowired
     private Clock clock;
 
-    @MockBean
+    @MockitoBean
     private UserAccountRepository userAccountRepository;
 
-    @MockBean
+    @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
 
     private final ConcurrentMap<UUID, RefreshToken> tokenStore = new ConcurrentHashMap<>();
@@ -122,11 +123,11 @@ class AuthIntegrationTest {
             String email = invocation.getArgument(0);
             return Optional.ofNullable(userByEmail.get(email));
         });
-        when(userAccountRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+        when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             return Optional.ofNullable(userById.get(userId));
         });
-        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> {
+        when(refreshTokenRepository.save(nonNullArgument())).thenAnswer(invocation -> {
             RefreshToken token = invocation.getArgument(0);
             if (token.getId() == null) {
                 token.setId(UUID.randomUUID());
@@ -143,7 +144,8 @@ class AuthIntegrationTest {
             }
             return Optional.of(tokenStore.get(id));
         });
-        when(refreshTokenRepository.findAllByUserIdAndRevokedFalseOrderByExpiresAtAsc(any(UUID.class)))
+        when(refreshTokenRepository.findAllByUserIdAndRevokedFalseOrderByExpiresAtAsc(
+                nonNullArgument()))
                 .thenAnswer(invocation -> {
                     UUID userId = invocation.getArgument(0);
                     return tokenStore.values().stream()
@@ -152,7 +154,7 @@ class AuthIntegrationTest {
                             .sorted(Comparator.comparing(RefreshToken::getExpiresAt))
                             .toList();
                 });
-        when(refreshTokenRepository.findAllByUserId(any(UUID.class))).thenAnswer(invocation -> {
+        when(refreshTokenRepository.findAllByUserId(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             return tokenStore.values().stream()
                     .filter(token -> token.getUser().getId().equals(userId))
@@ -179,7 +181,7 @@ class AuthIntegrationTest {
     @Test
     void loginRejectsInvalidPayloadWithConsistentError() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"email\":\"not-an-email\",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
@@ -401,7 +403,7 @@ class AuthIntegrationTest {
 
     private MvcResult performLogin(String email) throws Exception {
         return mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"email\":\"" + email + "\",\"password\":\"password\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
@@ -451,6 +453,12 @@ class AuthIntegrationTest {
         account.getRoles().add(role);
         account.setEnabled(true);
         return account;
+    }
+
+    @NonNull
+    @SuppressWarnings("null")
+    private static <T> T nonNullArgument() {
+        return ArgumentMatchers.notNull();
     }
 
     @TestConfiguration

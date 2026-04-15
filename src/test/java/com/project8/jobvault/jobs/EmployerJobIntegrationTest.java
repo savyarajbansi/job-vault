@@ -2,8 +2,10 @@ package com.project8.jobvault.jobs;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project8.jobvault.applications.JobApplicationRepository;
 import com.project8.jobvault.auth.JwtTokenService;
 import com.project8.jobvault.auth.RefreshTokenRepository;
+import com.project8.jobvault.notifications.NotificationRepository;
 import com.project8.jobvault.resumes.ResumeMetadataRepository;
 import com.project8.jobvault.resumes.ResumeStorageService;
 import com.project8.jobvault.users.Role;
@@ -19,17 +21,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.ArgumentMatchers;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.lang.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -66,22 +66,28 @@ class EmployerJobIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private JobRepository jobRepository;
 
-    @MockBean
+    @MockitoBean
     private UserAccountRepository userAccountRepository;
 
-    @MockBean
+    @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
 
-    @MockBean
+    @MockitoBean
     private RoleRepository roleRepository;
 
-    @MockBean
+    @MockitoBean
+    private NotificationRepository notificationRepository;
+
+    @MockitoBean
+    private JobApplicationRepository jobApplicationRepository;
+
+    @MockitoBean
     private ResumeMetadataRepository resumeMetadataRepository;
 
-    @MockBean
+    @MockitoBean
     private ResumeStorageService resumeStorageService;
 
     private final ConcurrentMap<UUID, Job> jobsById = new ConcurrentHashMap<>();
@@ -101,7 +107,7 @@ class EmployerJobIntegrationTest {
         otherEmployer = buildUser("employer2@example.com", employerRole);
         seekerUser = buildUser("user@example.com", seekerRole);
 
-        when(userAccountRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+        when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             if (employerUser.getId().equals(userId)) {
                 return Optional.of(employerUser);
@@ -115,11 +121,11 @@ class EmployerJobIntegrationTest {
             return Optional.empty();
         });
 
-        when(jobRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+        when(jobRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID jobId = invocation.getArgument(0);
             return Optional.ofNullable(jobsById.get(jobId));
         });
-        when(jobRepository.save(any(Job.class))).thenAnswer(invocation -> {
+        when(jobRepository.save(nonNullArgument())).thenAnswer(invocation -> {
             Job job = invocation.getArgument(0);
             if (job.getId() == null) {
                 job.setId(UUID.randomUUID());
@@ -127,11 +133,13 @@ class EmployerJobIntegrationTest {
             jobsById.put(job.getId(), job);
             return job;
         });
-        when(jobRepository.findAllByStatusOrderByCreatedAtDesc(JobStatus.PUBLISHED))
+        when(jobRepository.findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE))
                 .thenAnswer(invocation -> jobsById.values().stream()
-                        .filter(job -> job.getStatus() == JobStatus.PUBLISHED)
+                        .filter(job -> job.getStatus() == JobStatus.ACTIVE)
                         .toList());
-        when(jobRepository.findByIdAndStatus(any(UUID.class), any(JobStatus.class)))
+        when(jobRepository.findByIdAndStatus(
+                nonNullArgument(),
+                nonNullArgument()))
                 .thenAnswer(invocation -> {
                     UUID jobId = invocation.getArgument(0);
                     JobStatus status = invocation.getArgument(1);
@@ -147,10 +155,10 @@ class EmployerJobIntegrationTest {
     void employerCanCreatePublishDisableJob() throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andReturn();
 
@@ -159,7 +167,7 @@ class EmployerJobIntegrationTest {
         mockMvc.perform(post("/api/employer/jobs/{id}/publish", jobId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
 
         mockMvc.perform(post("/api/employer/jobs/{id}/disable", jobId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
@@ -171,7 +179,7 @@ class EmployerJobIntegrationTest {
     void employerCanUpdateOwnJob() throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -180,7 +188,7 @@ class EmployerJobIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/jobs/{id}", jobId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Senior Backend Engineer\",\"description\":\"Build APIs v2\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Senior Backend Engineer"))
@@ -191,7 +199,7 @@ class EmployerJobIntegrationTest {
     void nonEmployerIsDenied() throws Exception {
         mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
@@ -202,7 +210,7 @@ class EmployerJobIntegrationTest {
     void otherEmployerCannotModifyJob() throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -218,7 +226,7 @@ class EmployerJobIntegrationTest {
     void seekerCannotPublishJob() throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -233,15 +241,15 @@ class EmployerJobIntegrationTest {
     }
 
     @Test
-    void publicJobsOnlyReturnPublished() throws Exception {
+    void publicJobsOnlyReturnActive() throws Exception {
         Job draft = buildJob(employerUser, JobStatus.DRAFT);
-        Job published = buildJob(employerUser, JobStatus.PUBLISHED);
+        Job published = buildJob(employerUser, JobStatus.ACTIVE);
         jobsById.put(draft.getId(), draft);
         jobsById.put(published.getId(), published);
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(published.getId().toString()));
     }
 
@@ -261,6 +269,12 @@ class EmployerJobIntegrationTest {
 
     private String issueToken(UserAccount user) {
         return jwtTokenService.issueAccessToken(user).token();
+    }
+
+    @NonNull
+    @SuppressWarnings("null")
+    private static <T> T nonNullArgument() {
+        return ArgumentMatchers.notNull();
     }
 
     private Role buildRole(String name) {

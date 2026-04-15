@@ -1,0 +1,80 @@
+{
+  "properties": [
+    {
+      "name": "jobvault.storage.resumes-dir",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.jwt.issuer",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.jwt.secret",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.jwt.refresh-hash-secret",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.jwt.access-token-minutes",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "jobvault.security.jwt.refresh-token-days",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "jobvault.security.jwt.refresh-token-bytes",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "jobvault.security.jwt.csrf-token-bytes",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "jobvault.security.jwt.max-sessions",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "jobvault.security.cookies.refresh-token-name",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.cookies.csrf-token-name",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.cookies.same-site",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "jobvault.security.cookies.secure",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "jobvault.security.cookies.path",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "spring.mvc.cors.allowed-origins",
+      "type": "java.util.List<java.lang.String>"
+    },
+    {
+      "name": "spring.mvc.cors.allowed-methods",
+      "type": "java.util.List<java.lang.String>"
+    },
+    {
+      "name": "spring.mvc.cors.allowed-headers",
+      "type": "java.util.List<java.lang.String>"
+    },
+    {
+      "name": "spring.mvc.cors.allow-credentials",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "spring.mvc.cors.max-age",
+      "type": "java.time.Duration"
+    }
+  ]
+}

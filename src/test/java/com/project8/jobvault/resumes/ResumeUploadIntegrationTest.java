@@ -20,15 +20,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.ArgumentMatchers;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.lang.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.hamcrest.Matchers.notNullValue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -63,28 +64,28 @@ class ResumeUploadIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private ResumeMetadataRepository resumeMetadataRepository;
 
-    @MockBean
+    @MockitoBean
     private ResumeStorageService resumeStorageService;
 
-    @MockBean
+    @MockitoBean
     private UserAccountRepository userAccountRepository;
 
-    @MockBean
+    @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
 
-    @MockBean
+    @MockitoBean
     private RoleRepository roleRepository;
 
-    @MockBean
+    @MockitoBean
     private JobRepository jobRepository;
 
-    @MockBean
+    @MockitoBean
     private EmployerJobController employerJobController;
 
-    @MockBean
+    @MockitoBean
     private PublicJobController publicJobController;
 
     private final ConcurrentMap<UUID, ResumeMetadata> resumesById = new ConcurrentHashMap<>();
@@ -98,7 +99,7 @@ class ResumeUploadIntegrationTest {
         Role seekerRole = buildRole("JOB_SEEKER");
         seekerUser = buildUser("user@example.com", seekerRole);
 
-        when(userAccountRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+        when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             if (seekerUser.getId().equals(userId)) {
                 return Optional.of(seekerUser);
@@ -106,7 +107,7 @@ class ResumeUploadIntegrationTest {
             return Optional.empty();
         });
 
-        when(resumeMetadataRepository.save(any(ResumeMetadata.class))).thenAnswer(invocation -> {
+        when(resumeMetadataRepository.save(nonNullArgument())).thenAnswer(invocation -> {
             ResumeMetadata metadata = invocation.getArgument(0);
             if (metadata.getId() == null) {
                 metadata.setId(UUID.randomUUID());
@@ -115,10 +116,12 @@ class ResumeUploadIntegrationTest {
             return metadata;
         });
 
-        when(resumeStorageService.store(any(UUID.class), any())).thenAnswer(invocation -> {
-            UUID resumeId = invocation.getArgument(0);
-            return "storage/resumes/" + resumeId + ".pdf";
-        });
+        when(resumeStorageService.store(
+                nonNullArgument(),
+                nonNullArgument())).thenAnswer(invocation -> {
+                    UUID resumeId = invocation.getArgument(0);
+                    return "storage/resumes/" + resumeId + ".pdf";
+                });
     }
 
     @Test
@@ -133,7 +136,7 @@ class ResumeUploadIntegrationTest {
                 .file(file)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.resumeId", notNullValue()))
+                .andExpect(jsonPath("$.resumeId").exists())
                 .andExpect(jsonPath("$.status").value("UPLOADED"))
                 .andReturn();
 
@@ -149,6 +152,42 @@ class ResumeUploadIntegrationTest {
                 "file",
                 "resume.txt",
                 "text/plain",
+                "resume content".getBytes());
+
+        mockMvc.perform(multipart("/api/seeker/resumes/upload")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("ERR_UPLOAD_001"));
+    }
+
+    @Test
+    void uploadAcceptsPdfWithMissingContentType() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "resume.pdf",
+                null,
+                "resume content".getBytes());
+
+        MvcResult result = mockMvc.perform(multipart("/api/seeker/resumes/upload")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode node = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        UUID resumeId = UUID.fromString(node.path("resumeId").asText());
+        ResumeMetadata metadata = resumesById.get(resumeId);
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        assertEquals("application/pdf", metadata.getContentType());
+    }
+
+    @Test
+    void uploadRejectsMissingContentTypeWithoutPdfExtension() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "resume.txt",
+                null,
                 "resume content".getBytes());
 
         mockMvc.perform(multipart("/api/seeker/resumes/upload")
@@ -191,6 +230,12 @@ class ResumeUploadIntegrationTest {
 
     private String issueToken(UserAccount user) {
         return jwtTokenService.issueAccessToken(user).token();
+    }
+
+    @NonNull
+    @SuppressWarnings("null")
+    private static <T> T nonNullArgument() {
+        return ArgumentMatchers.notNull();
     }
 
     private Role buildRole(String name) {

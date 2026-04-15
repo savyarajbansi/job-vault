@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
@@ -139,21 +140,29 @@ public class AuthController {
     }
 
     private AuthUserSummary toSummary(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        UUID userId = principal.userId();
+        if (userId == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
         Set<String> roles = new HashSet<>();
         if (principal.roles() != null) {
             roles.addAll(principal.roles());
         }
-        return new AuthUserSummary(principal.userId(), roles);
+        return new AuthUserSummary(userId, roles);
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
-        return userAccountRepository.findById(principal.userId())
+        UUID userId = principal.userId();
+        if (userId == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
     }

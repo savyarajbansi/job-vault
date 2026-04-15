@@ -47,12 +47,12 @@ public class ResumeUploadController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestPart("file") @NotNull MultipartFile file) {
         UserAccount seeker = requireUser(principal);
-        validatePdf(file);
+        String contentType = resolvePdfContentType(file);
 
         ResumeMetadata metadata = new ResumeMetadata();
         metadata.setSeeker(seeker);
         metadata.setOriginalFilename(safeFilename(file.getOriginalFilename()));
-        metadata.setContentType(file.getContentType());
+        metadata.setContentType(contentType);
         metadata.setFileSizeBytes(file.getSize());
         metadata.setProcessingStatus(ResumeProcessingStatus.UPLOADED);
         ResumeMetadata saved = resumeMetadataRepository.save(metadata);
@@ -76,7 +76,7 @@ public class ResumeUploadController {
                 .body(new ResumeUploadResponse(saved.getId(), saved.getProcessingStatus()));
     }
 
-    private void validatePdf(MultipartFile file) {
+    private String resolvePdfContentType(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new UploadErrorException(
                     UploadErrorCodes.UPLOAD_FAILED,
@@ -91,7 +91,7 @@ public class ResumeUploadController {
                     HttpStatus.PAYLOAD_TOO_LARGE,
                     Map.of("reason", "file_too_large"));
         }
-        String contentType = file.getContentType();
+        String contentType = normalizeContentType(file.getContentType());
         String filename = file.getOriginalFilename();
         boolean hasPdfType = contentType != null && contentType.equalsIgnoreCase(PDF_CONTENT_TYPE);
         boolean hasPdfName = filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".pdf");
@@ -102,13 +102,29 @@ public class ResumeUploadController {
                     HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                     Map.of("reason", "unsupported_type"));
         }
+        if (hasPdfName) {
+            return PDF_CONTENT_TYPE;
+        }
+        return contentType;
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        String trimmed = contentType.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
-        return userAccountRepository.findById(principal.userId())
+        UUID userId = principal.userId();
+        if (userId == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
     }

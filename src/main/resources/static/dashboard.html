@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobVault Demo Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Space+Grotesk:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f2efe8;
+        --panel: #ffffff;
+        --ink: #1b1b1b;
+        --muted: #6b6b6b;
+        --accent: #0f7c7c;
+        --accent-2: #f0a202;
+        --border: #e3dccf;
+        --shadow: 0 18px 40px rgba(27, 27, 27, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, #fff7e6 0%, transparent 55%),
+          radial-gradient(circle at 30% 20%, #d9f2f1 0%, transparent 45%),
+          var(--bg);
+        min-height: 100vh;
+        padding: 32px;
+      }
+
+      .shell {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 24px;
+      }
+
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 20px 24px;
+        background: var(--panel);
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        animation: fadeUp 0.7s ease forwards;
+      }
+
+      h1 {
+        font-family: "Fraunces", serif;
+        font-size: clamp(28px, 3vw, 40px);
+        margin: 0;
+      }
+
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .bell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: #f6f3ed;
+        border: 1px solid var(--border);
+      }
+
+      .bell svg {
+        width: 22px;
+        height: 22px;
+        fill: var(--ink);
+      }
+
+      .badge {
+        background: var(--accent);
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        min-width: 28px;
+        text-align: center;
+      }
+
+      .grid {
+        display: grid;
+        gap: 24px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .panel {
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 20px 22px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        animation: fadeUp 0.8s ease forwards;
+      }
+
+      .panel h2 {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+
+      .token {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-family: inherit;
+      }
+
+      button {
+        border: none;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #ece7dd;
+        color: var(--ink);
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .skill {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #f9f6f0;
+        border: 1px solid var(--border);
+      }
+
+      .notification {
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #fefcf8;
+        display: grid;
+        gap: 6px;
+      }
+
+      .notification.unread {
+        border-color: var(--accent);
+        box-shadow: inset 0 0 0 1px rgba(15, 124, 124, 0.2);
+      }
+
+      .meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .hint {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 600px) {
+        body {
+          padding: 20px;
+        }
+        header {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div>
+          <h1>JobVault Demo Dashboard</h1>
+          <p class="subtitle">
+            Trending skills + in-app notifications (polling every 30 seconds).
+          </p>
+        </div>
+        <div class="bell">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5-6.71V3a2 2 0 1 0-4 0v1.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2z"
+            />
+          </svg>
+          <div class="badge" id="unreadCount">0</div>
+        </div>
+      </header>
+
+      <div class="panel">
+        <h2>Access Token</h2>
+        <p class="hint">
+          Paste your JWT access token to view notifications. Trending skills are
+          public.
+        </p>
+        <div class="token">
+          <input type="text" id="tokenInput" placeholder="Bearer token" />
+          <button id="saveToken">Save</button>
+          <button class="secondary" id="clearToken">Clear</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Trending Skills</h2>
+          <ul id="skillsList"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Notifications</h2>
+          <ul id="notificationsList"></ul>
+          <p class="hint" id="notificationHint"></p>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const tokenInput = document.getElementById("tokenInput");
+      const saveTokenButton = document.getElementById("saveToken");
+      const clearTokenButton = document.getElementById("clearToken");
+      const unreadCount = document.getElementById("unreadCount");
+      const skillsList = document.getElementById("skillsList");
+      const notificationsList = document.getElementById("notificationsList");
+      const notificationHint = document.getElementById("notificationHint");
+
+      const tokenKey = "jobvault.token";
+
+      function getToken() {
+        return localStorage.getItem(tokenKey);
+      }
+
+      function setToken(token) {
+        if (token) {
+          localStorage.setItem(tokenKey, token);
+        }
+      }
+
+      function clearToken() {
+        localStorage.removeItem(tokenKey);
+      }
+
+      function authHeaders() {
+        const token = getToken();
+        if (!token) {
+          return {};
+        }
+        return { Authorization: `Bearer ${token}` };
+      }
+
+      async function loadTrendingSkills() {
+        const response = await fetch("/api/jobs/trending-skills");
+        if (!response.ok) {
+          skillsList.innerHTML =
+            '<li class="hint">Unable to load trending skills.</li>';
+          return;
+        }
+        const data = await response.json();
+        if (!data.length) {
+          skillsList.innerHTML = '<li class="hint">No skill data yet.</li>';
+          return;
+        }
+        skillsList.innerHTML = data
+          .map(
+            (item) => `
+          <li class=\"skill\">
+            <span>${item.skillName}</span>
+            <strong>${item.score.toFixed(1)}</strong>
+          </li>
+        `,
+          )
+          .join("");
+      }
+
+      async function loadUnreadCount() {
+        const token = getToken();
+        if (!token) {
+          unreadCount.textContent = "0";
+          return;
+        }
+        const response = await fetch("/api/notifications/unread-count", {
+          headers: authHeaders(),
+        });
+        if (!response.ok) {
+          unreadCount.textContent = "0";
+          return;
+        }
+        const data = await response.json();
+        unreadCount.textContent = data.unreadCount;
+      }
+
+      async function markAsRead(id) {
+        await fetch(`/api/notifications/${id}/read`, {
+          method: "POST",
+          headers: authHeaders(),
+        });
+        await loadNotifications();
+        await loadUnreadCount();
+      }
+
+      async function loadNotifications() {
+        const token = getToken();
+        if (!token) {
+          notificationsList.innerHTML = "";
+          notificationHint.textContent =
+            "Add your access token to see notifications.";
+          return;
+        }
+        const response = await fetch("/api/notifications", {
+          headers: authHeaders(),
+        });
+        if (!response.ok) {
+          notificationsList.innerHTML = "";
+          notificationHint.textContent = "Unable to load notifications.";
+          return;
+        }
+        const data = await response.json();
+        if (!data.length) {
+          notificationsList.innerHTML = "";
+          notificationHint.textContent = "No notifications yet.";
+          return;
+        }
+        notificationHint.textContent = "";
+        notificationsList.innerHTML = data
+          .map(
+            (item) => `
+          <li class=\"notification ${item.isRead ? "" : "unread"}\">
+            <strong>${item.message}</strong>
+            <span class=\"meta\">${item.type} · ${new Date(item.createdAt).toLocaleString()}</span>
+            ${item.isRead ? "" : `<button class=\"secondary\" data-id=\"${item.id}\">Mark read</button>`}
+          </li>
+        `,
+          )
+          .join("");
+
+        document.querySelectorAll("button[data-id]").forEach((button) => {
+          button.addEventListener("click", () => markAsRead(button.dataset.id));
+        });
+      }
+
+      saveTokenButton.addEventListener("click", () => {
+        const value = tokenInput.value.trim();
+        if (value) {
+          setToken(value);
+          loadUnreadCount();
+          loadNotifications();
+        }
+      });
+
+      clearTokenButton.addEventListener("click", () => {
+        clearToken();
+        tokenInput.value = "";
+        loadUnreadCount();
+        loadNotifications();
+      });
+
+      tokenInput.value = getToken() || "";
+
+      loadTrendingSkills();
+      loadUnreadCount();
+      loadNotifications();
+
+      setInterval(loadUnreadCount, 30000);
+      setInterval(loadNotifications, 30000);
+    </script>
+  </body>
+</html>
