@@ -2,11 +2,13 @@ package com.project8.jobvault.resumes;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project8.jobvault.applications.JobApplicationRepository;
 import com.project8.jobvault.auth.JwtTokenService;
 import com.project8.jobvault.auth.RefreshTokenRepository;
 import com.project8.jobvault.jobs.EmployerJobController;
 import com.project8.jobvault.jobs.JobRepository;
 import com.project8.jobvault.jobs.PublicJobController;
+import com.project8.jobvault.notifications.NotificationRepository;
 import com.project8.jobvault.users.Role;
 import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
@@ -81,6 +83,12 @@ class ResumeUploadIntegrationTest {
 
     @MockitoBean
     private JobRepository jobRepository;
+
+    @MockitoBean
+    private JobApplicationRepository jobApplicationRepository;
+
+    @MockitoBean
+    private NotificationRepository notificationRepository;
 
     @MockitoBean
     private EmployerJobController employerJobController;

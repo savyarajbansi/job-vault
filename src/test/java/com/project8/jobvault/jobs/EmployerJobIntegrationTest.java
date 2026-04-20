@@ -8,10 +8,12 @@ import com.project8.jobvault.auth.RefreshTokenRepository;
 import com.project8.jobvault.notifications.NotificationRepository;
 import com.project8.jobvault.resumes.ResumeMetadataRepository;
 import com.project8.jobvault.resumes.ResumeStorageService;
+import com.project8.jobvault.testing.DeterministicConcurrencyHarness;
 import com.project8.jobvault.users.Role;
 import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +32,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -149,6 +154,74 @@ class EmployerJobIntegrationTest {
                     }
                     return Optional.of(job);
                 });
+        when(jobRepository.transitionDraftToActive(
+                nonNullArgument(),
+                nonNullArgument(),
+                nonNullArgument()))
+                .thenAnswer(invocation -> {
+                    UUID jobId = invocation.getArgument(0);
+                    UUID employerId = invocation.getArgument(1);
+                    Instant publishedAt = invocation.getArgument(2);
+                    Job job = jobsById.get(jobId);
+                    if (job == null || job.getEmployer() == null || !employerId.equals(job.getEmployer().getId())) {
+                        return 0;
+                    }
+                    if (job.getStatus() != JobStatus.DRAFT) {
+                        return 0;
+                    }
+                    job.setStatus(JobStatus.ACTIVE);
+                    job.setPublishedAt(publishedAt);
+                    job.setDisabledAt(null);
+                    jobsById.put(jobId, job);
+                    return 1;
+                });
+        when(jobRepository.transitionActiveToDisabled(
+                nonNullArgument(),
+                nonNullArgument(),
+                nonNullArgument()))
+                .thenAnswer(invocation -> {
+                    UUID jobId = invocation.getArgument(0);
+                    UUID employerId = invocation.getArgument(1);
+                    Instant disabledAt = invocation.getArgument(2);
+                    Job job = jobsById.get(jobId);
+                    if (job == null || job.getEmployer() == null || !employerId.equals(job.getEmployer().getId())) {
+                        return 0;
+                    }
+                    if (job.getStatus() != JobStatus.ACTIVE) {
+                        return 0;
+                    }
+                    job.setStatus(JobStatus.DISABLED);
+                    job.setDisabledAt(disabledAt);
+                    jobsById.put(jobId, job);
+                    return 1;
+                });
+        when(jobRepository.transitionDisabledToActive(
+                nonNullArgument(),
+                nonNullArgument(),
+                nonNullArgument()))
+                .thenAnswer(invocation -> {
+                    UUID jobId = invocation.getArgument(0);
+                    UUID employerId = invocation.getArgument(1);
+                    Instant publishedAt = invocation.getArgument(2);
+                    Job job = jobsById.get(jobId);
+                    if (job == null || job.getEmployer() == null || !employerId.equals(job.getEmployer().getId())) {
+                        return 0;
+                    }
+                    synchronized (job) {
+                        if (job.getStatus() != JobStatus.DISABLED) {
+                            return 0;
+                        }
+                        if (job.getModerationAction() != null
+                                && job.getModerationAction() != JobModerationAction.APPROVED) {
+                            return 0;
+                        }
+                        job.setStatus(JobStatus.ACTIVE);
+                        job.setPublishedAt(publishedAt);
+                        job.setDisabledAt(null);
+                        jobsById.put(jobId, job);
+                        return 1;
+                    }
+                });
     }
 
     @Test
@@ -193,6 +266,23 @@ class EmployerJobIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Senior Backend Engineer"))
                 .andExpect(jsonPath("$.description").value("Build APIs v2"));
+    }
+
+    @Test
+    void employerPublishClearsStaleDisabledAtForDraftJob() throws Exception {
+        Job draft = buildJob(employerUser, JobStatus.DRAFT);
+        draft.setDisabledAt(Instant.parse("2026-04-19T09:00:00Z"));
+        jobsById.put(draft.getId(), draft);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/publish", draft.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.disabledAt").value(nullValue()));
+
+        Job saved = jobsById.get(draft.getId());
+        assertEquals(JobStatus.ACTIVE, saved.getStatus());
+        assertNull(saved.getDisabledAt());
     }
 
     @Test
@@ -241,6 +331,63 @@ class EmployerJobIntegrationTest {
     }
 
     @Test
+    void unauthenticatedEmployerLifecycleRequestsReturnUnauthorized() throws Exception {
+        Job draft = buildJob(employerUser, JobStatus.DRAFT);
+        jobsById.put(draft.getId(), draft);
+
+        mockMvc.perform(post("/api/employer/jobs")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_001"));
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/publish", draft.getId()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_001"));
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", draft.getId()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_001"));
+    }
+
+    @Test
+    void idempotentPublishAndDisableReturnConflictWithoutModerationMutation() throws Exception {
+        Job active = buildJob(employerUser, JobStatus.ACTIVE);
+        active.setModerationAction(JobModerationAction.APPROVED);
+        active.setModerationReason("admin-approved");
+        active.setModeratedAt(Instant.parse("2026-04-19T06:10:00Z"));
+        active.setModeratedBy(otherEmployer);
+        jobsById.put(active.getId(), active);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/publish", active.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+
+        Job unchangedAfterPublishConflict = jobsById.get(active.getId());
+        assertEquals(JobStatus.ACTIVE, unchangedAfterPublishConflict.getStatus());
+        assertEquals(JobModerationAction.APPROVED, unchangedAfterPublishConflict.getModerationAction());
+        assertEquals("admin-approved", unchangedAfterPublishConflict.getModerationReason());
+        assertEquals(Instant.parse("2026-04-19T06:10:00Z"), unchangedAfterPublishConflict.getModeratedAt());
+        assertEquals(otherEmployer.getId(), unchangedAfterPublishConflict.getModeratedBy().getId());
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/disable", active.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DISABLED"));
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/disable", active.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+
+        Job unchangedAfterDisableConflict = jobsById.get(active.getId());
+        assertEquals(JobStatus.DISABLED, unchangedAfterDisableConflict.getStatus());
+        assertEquals(JobModerationAction.APPROVED, unchangedAfterDisableConflict.getModerationAction());
+        assertEquals("admin-approved", unchangedAfterDisableConflict.getModerationReason());
+        assertEquals(Instant.parse("2026-04-19T06:10:00Z"), unchangedAfterDisableConflict.getModeratedAt());
+        assertEquals(otherEmployer.getId(), unchangedAfterDisableConflict.getModeratedBy().getId());
+    }
+
+    @Test
     void publicJobsOnlyReturnActive() throws Exception {
         Job draft = buildJob(employerUser, JobStatus.DRAFT);
         Job published = buildJob(employerUser, JobStatus.ACTIVE);
@@ -262,9 +409,159 @@ class EmployerJobIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void publicJobDetailsReturnNotFoundForMissingJob() throws Exception {
+        mockMvc.perform(get("/api/jobs/{id}", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void employerCanReactivateDisabledJobWhenModerationActionIsNull() throws Exception {
+        Job disabled = buildJob(employerUser, JobStatus.DISABLED);
+        disabled.setDisabledAt(Instant.parse("2026-04-19T07:30:00Z"));
+        jobsById.put(disabled.getId(), disabled);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", disabled.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.disabledAt").value(nullValue()));
+
+        Job saved = jobsById.get(disabled.getId());
+        assertEquals(JobStatus.ACTIVE, saved.getStatus());
+        assertNull(saved.getModerationAction());
+        assertNull(saved.getDisabledAt());
+    }
+
+    @Test
+    void employerCanReactivateDisabledJobWhenModerationActionIsApproved() throws Exception {
+        Job disabled = buildJob(employerUser, JobStatus.DISABLED);
+        disabled.setModerationAction(JobModerationAction.APPROVED);
+        disabled.setDisabledAt(Instant.parse("2026-04-19T07:45:00Z"));
+        jobsById.put(disabled.getId(), disabled);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", disabled.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.disabledAt").value(nullValue()));
+
+        Job saved = jobsById.get(disabled.getId());
+        assertEquals(JobModerationAction.APPROVED, saved.getModerationAction());
+        assertNull(saved.getDisabledAt());
+    }
+
+    @Test
+    void employerCannotReactivateWhenModerationActionRequiresAdminApproval() throws Exception {
+        Job rejected = buildJob(employerUser, JobStatus.DISABLED);
+        rejected.setModerationAction(JobModerationAction.REJECTED);
+        jobsById.put(rejected.getId(), rejected);
+
+        Job disabledByAdmin = buildJob(employerUser, JobStatus.DISABLED);
+        disabledByAdmin.setModerationAction(JobModerationAction.DISABLED);
+        jobsById.put(disabledByAdmin.getId(), disabledByAdmin);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", rejected.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", disabledByAdmin.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+
+        assertEquals(JobStatus.DISABLED, jobsById.get(rejected.getId()).getStatus());
+        assertEquals(JobModerationAction.REJECTED, jobsById.get(rejected.getId()).getModerationAction());
+        assertEquals(JobStatus.DISABLED, jobsById.get(disabledByAdmin.getId()).getStatus());
+        assertEquals(JobModerationAction.DISABLED, jobsById.get(disabledByAdmin.getId()).getModerationAction());
+    }
+
+    @Test
+    void adminApprovalPrecedenceBlocksThenAllowsEmployerReactivation() throws Exception {
+        Job disabled = buildJob(employerUser, JobStatus.DISABLED);
+        disabled.setModerationAction(JobModerationAction.REJECTED);
+        disabled.setModerationReason("policy violation");
+        disabled.setDisabledAt(Instant.parse("2026-04-19T08:00:00Z"));
+        jobsById.put(disabled.getId(), disabled);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", disabled.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+
+        Job blockedState = jobsById.get(disabled.getId());
+        assertEquals(JobStatus.DISABLED, blockedState.getStatus());
+        assertEquals(JobModerationAction.REJECTED, blockedState.getModerationAction());
+        assertEquals("policy violation", blockedState.getModerationReason());
+
+        blockedState.setModerationAction(JobModerationAction.APPROVED);
+        blockedState.setModerationReason(null);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", disabled.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.disabledAt").value(nullValue()));
+
+        Job reactivated = jobsById.get(disabled.getId());
+        assertEquals(JobStatus.ACTIVE, reactivated.getStatus());
+        assertEquals(JobModerationAction.APPROVED, reactivated.getModerationAction());
+        assertNull(reactivated.getModerationReason());
+    }
+
+    @Test
+    void roleOwnershipAndStatePrecedenceIs403Then404Then409() throws Exception {
+        Job blocked = buildJob(employerUser, JobStatus.DISABLED);
+        blocked.setModerationAction(JobModerationAction.REJECTED);
+        jobsById.put(blocked.getId(), blocked);
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", blocked.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"));
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", blocked.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(otherEmployer)))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", blocked.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void concurrentReactivateHasSingleWinnerAndSingleConflict() throws Exception {
+        UUID jobId = DeterministicConcurrencyHarness.withBootstrapRetry("employer-reactivate-bootstrap", 2, () -> {
+            Job disabled = buildJob(employerUser, JobStatus.DISABLED);
+            disabled.setModerationAction(JobModerationAction.APPROVED);
+            jobsById.put(disabled.getId(), disabled);
+            return disabled.getId();
+        });
+
+        DeterministicConcurrencyHarness.ContentionResult result = DeterministicConcurrencyHarness.runTwoContenders(
+                "employer-reactivate-race",
+                "reactivate-a",
+                () -> performReactivate(jobId),
+                "reactivate-b",
+                () -> performReactivate(jobId));
+
+        DeterministicConcurrencyHarness.assertSingleWinnerAndConflict("employer-reactivate-race", result, 200);
+
+        Job updated = jobsById.get(jobId);
+        assertEquals(JobStatus.ACTIVE, updated.getStatus());
+        assertEquals(JobModerationAction.APPROVED, updated.getModerationAction());
+    }
+
     private UUID extractJobId(MvcResult result) throws Exception {
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsByteArray());
         return UUID.fromString(node.path("id").asText());
+    }
+
+    private DeterministicConcurrencyHarness.ContentionResponse performReactivate(UUID jobId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/employer/jobs/{id}/reactivate", jobId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andReturn();
+        return DeterministicConcurrencyHarness.ContentionResponse.of(
+                result.getResponse().getStatus(),
+                result.getResponse().getContentAsString());
     }
 
     private String issueToken(UserAccount user) {

@@ -2,9 +2,15 @@ package com.project8.jobvault.auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project8.jobvault.applications.JobApplicationRepository;
+import com.project8.jobvault.jobs.JobRepository;
+import com.project8.jobvault.notifications.NotificationRepository;
+import com.project8.jobvault.resumes.ResumeMetadataRepository;
+import com.project8.jobvault.skills.SkillRepository;
 import com.project8.jobvault.users.Role;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.users.RoleRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -94,6 +100,24 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
+
+    @MockitoBean
+    private JobRepository jobRepository;
+
+    @MockitoBean
+    private RoleRepository roleRepository;
+
+    @MockitoBean
+    private JobApplicationRepository jobApplicationRepository;
+
+    @MockitoBean
+    private SkillRepository skillRepository;
+
+    @MockitoBean
+    private NotificationRepository notificationRepository;
+
+    @MockitoBean
+    private ResumeMetadataRepository resumeMetadataRepository;
 
     private final ConcurrentMap<UUID, RefreshToken> tokenStore = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UUID> tokenHashIndex = new ConcurrentHashMap<>();
