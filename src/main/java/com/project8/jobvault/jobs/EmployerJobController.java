@@ -87,17 +87,12 @@ public class EmployerJobController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount employer = requireUser(principal);
-        Optional<Job> ownedJob = findOwned(jobId, employer.getId());
-        if (ownedJob.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        int updated = jobRepository.transitionDraftToActive(jobId, employer.getId(), clock.instant());
+        if (updated == 0) {
+            throwNotFoundOrConflict(jobId, employer.getId(), "Job is not in DRAFT");
         }
-        Job job = ownedJob.get();
-        if (job.getStatus() != JobStatus.DRAFT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not in DRAFT");
-        }
-        job.setStatus(JobStatus.ACTIVE);
-        job.setPublishedAt(clock.instant());
-        Job saved = jobRepository.save(job);
+        Job saved = findOwned(jobId, employer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -106,18 +101,39 @@ public class EmployerJobController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount employer = requireUser(principal);
-        Optional<Job> ownedJob = findOwned(jobId, employer.getId());
-        if (ownedJob.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        int updated = jobRepository.transitionActiveToDisabled(jobId, employer.getId(), clock.instant());
+        if (updated == 0) {
+            throwNotFoundOrConflict(jobId, employer.getId(), "Job is not ACTIVE");
         }
-        Job job = ownedJob.get();
-        if (job.getStatus() != JobStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not ACTIVE");
-        }
-        job.setStatus(JobStatus.DISABLED);
-        job.setDisabledAt(clock.instant());
-        Job saved = jobRepository.save(job);
+        Job saved = findOwned(jobId, employer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(saved));
+    }
+
+    @PostMapping("/{jobId}/reactivate")
+    public ResponseEntity<JobDetailResponse> reactivate(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable UUID jobId) {
+        UserAccount employer = requireUser(principal);
+        int updated = jobRepository.transitionDisabledToActive(jobId, employer.getId(), clock.instant());
+        if (updated == 0) {
+            throwNotFoundOrConflict(jobId, employer.getId(), "Job cannot be reactivated");
+        }
+        Job saved = findOwned(jobId, employer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        return ResponseEntity.ok(toDetail(saved));
+    }
+
+    private void throwNotFoundOrConflict(UUID jobId, UUID employerId, String conflictReason) {
+        Optional<Job> existing = jobRepository.findById(jobId);
+        if (existing.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
+        }
+        Job job = existing.get();
+        if (job.getEmployer() == null || !Objects.equals(job.getEmployer().getId(), employerId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, conflictReason);
     }
 
     private Optional<Job> findOwned(UUID jobId, UUID employerId) {

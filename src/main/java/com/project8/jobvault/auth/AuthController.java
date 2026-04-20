@@ -61,7 +61,7 @@ public class AuthController {
         this.cookieService = cookieService;
         Binder binder = Binder.get(environment);
         List<String> configuredOrigins = binder
-                .bind("spring.web.cors.allowed-origins", Bindable.listOf(String.class))
+                .bind("spring.mvc.cors.allowed-origins", Bindable.listOf(String.class))
                 .orElse(List.of());
         this.allowedOrigins = normalizeAllowedOrigins(configuredOrigins);
     }

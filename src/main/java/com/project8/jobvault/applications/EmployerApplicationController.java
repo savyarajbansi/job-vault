@@ -7,7 +7,9 @@ import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -51,21 +53,30 @@ public class EmployerApplicationController {
             @PathVariable UUID applicationId,
             @Valid @RequestBody ApplicationStatusUpdateRequest request) {
         UserAccount employer = requireUser(principal);
-        JobApplication application = jobApplicationRepository
-                .findByIdAndJobEmployerId(applicationId, employer.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
         ApplicationStatus newStatus = request.status();
         if (!EMPLOYER_STATUSES.contains(newStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported status change");
         }
-        application.setStatus(newStatus);
-        if (newStatus == ApplicationStatus.UNDER_REVIEW) {
-            application.setReviewedAt(clock.instant());
+        ApplicationStatus expectedStatus = newStatus == ApplicationStatus.UNDER_REVIEW
+                ? ApplicationStatus.SUBMITTED
+                : ApplicationStatus.UNDER_REVIEW;
+        Instant now = clock.instant();
+        Instant reviewedAt = newStatus == ApplicationStatus.UNDER_REVIEW ? now : null;
+        Instant decidedAt = newStatus == ApplicationStatus.UNDER_REVIEW ? null : now;
+
+        int updated = jobApplicationRepository.transitionForEmployer(
+                applicationId,
+                employer.getId(),
+                expectedStatus,
+                newStatus,
+                reviewedAt,
+                decidedAt);
+        if (updated == 0) {
+            throw resolveMissingOrConflict(applicationId, employer.getId(), "Invalid application transition");
         }
-        if (newStatus == ApplicationStatus.REJECTED || newStatus == ApplicationStatus.ACCEPTED) {
-            application.setDecidedAt(clock.instant());
-        }
-        JobApplication saved = jobApplicationRepository.save(application);
+
+        JobApplication saved = jobApplicationRepository.findByIdAndJobEmployerId(applicationId, employer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
 
         UserAccount seeker = saved.getSeeker();
         if (seeker != null) {
@@ -77,6 +88,23 @@ public class EmployerApplicationController {
         }
 
         return ResponseEntity.ok(toResponse(saved));
+    }
+
+    private ResponseStatusException resolveMissingOrConflict(
+            UUID applicationId,
+            UUID employerId,
+            String conflictReason) {
+        Optional<JobApplication> existing = jobApplicationRepository.findById(applicationId);
+        if (existing.isEmpty()) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
+        }
+        JobApplication application = existing.get();
+        if (application.getJob() == null
+                || application.getJob().getEmployer() == null
+                || !employerId.equals(application.getJob().getEmployer().getId())) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
+        }
+        return new ResponseStatusException(HttpStatus.CONFLICT, conflictReason);
     }
 
     private JobApplicationResponse toResponse(JobApplication application) {

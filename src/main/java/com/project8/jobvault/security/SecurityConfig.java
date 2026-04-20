@@ -65,16 +65,16 @@ public class SecurityConfig {
                 Binder binder = Binder.get(environment);
                 CorsConfiguration cors = new CorsConfiguration();
                 cors.setAllowedOrigins(binder
-                                .bind("spring.web.cors.allowed-origins", Bindable.listOf(String.class))
+                                .bind("spring.mvc.cors.allowed-origins", Bindable.listOf(String.class))
                                 .orElse(List.of()));
                 cors.setAllowedMethods(binder
-                                .bind("spring.web.cors.allowed-methods", Bindable.listOf(String.class))
+                                .bind("spring.mvc.cors.allowed-methods", Bindable.listOf(String.class))
                                 .orElse(List.of()));
                 cors.setAllowedHeaders(binder
-                                .bind("spring.web.cors.allowed-headers", Bindable.listOf(String.class))
+                                .bind("spring.mvc.cors.allowed-headers", Bindable.listOf(String.class))
                                 .orElse(List.of()));
-                cors.setAllowCredentials(binder.bind("spring.web.cors.allow-credentials", Boolean.class).orElse(false));
-                cors.setMaxAge(binder.bind("spring.web.cors.max-age", Long.class).orElse(1800L));
+                cors.setAllowCredentials(binder.bind("spring.mvc.cors.allow-credentials", Boolean.class).orElse(false));
+                cors.setMaxAge(binder.bind("spring.mvc.cors.max-age", Long.class).orElse(1800L));
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/api/**", cors);
                 return source;
