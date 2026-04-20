@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   AuthTokensResponse,
   AuthUser,
+  getAccessToken,
   login,
   logout,
   refresh,
@@ -9,6 +10,15 @@ import {
 } from "./api/auth";
 
 const initialCreds = { email: "", password: "" };
+const AUTH_RECOVERY_CODE = "ERR_AUTH_003";
+
+function toUserMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Request failed.";
+  if (message.includes(AUTH_RECOVERY_CODE)) {
+    return "Your session has ended. Please sign in again.";
+  }
+  return message;
+}
 
 export default function App() {
   const [credentials, setCredentials] = useState(initialCreds);
@@ -18,6 +28,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const clearSessionState = () => {
+    setAuth(null);
+    setProfile(null);
+  };
+
   const handleLogin = async () => {
     setBusy(true);
     setError(null);
@@ -26,9 +41,9 @@ export default function App() {
       const result = await login(credentials.email, credentials.password);
       setAuth(result);
       setProfile(result.user);
-      setStatus("Signed in. Access token is stored in memory only.");
+      setStatus("Signed in. Access token is stored in localStorage.");
     } catch (err) {
-      setError((err as Error).message);
+      setError(toUserMessage(err));
       setStatus(null);
     } finally {
       setBusy(false);
@@ -45,7 +60,7 @@ export default function App() {
       setProfile(result.user);
       setStatus("Access token refreshed.");
     } catch (err) {
-      setError((err as Error).message);
+      setError(toUserMessage(err));
       setStatus(null);
     } finally {
       setBusy(false);
@@ -53,19 +68,21 @@ export default function App() {
   };
 
   const handleWhoAmI = async () => {
-    if (!auth?.accessToken) {
-      setError("No access token in memory.");
+    if (!getAccessToken()) {
+      clearSessionState();
+      setStatus(null);
+      setError("Sign in to load your profile.");
       return;
     }
     setBusy(true);
     setError(null);
     setStatus("Fetching profile...");
     try {
-      const result = await whoami(auth.accessToken);
+      const result = await whoami();
       setProfile(result);
       setStatus("Profile loaded.");
     } catch (err) {
-      setError((err as Error).message);
+      setError(toUserMessage(err));
       setStatus(null);
     } finally {
       setBusy(false);
@@ -73,21 +90,22 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    if (!auth?.accessToken) {
-      setAuth(null);
-      setProfile(null);
-      return;
-    }
     setBusy(true);
     setError(null);
+    if (!getAccessToken()) {
+      clearSessionState();
+      setStatus("No active session found. Cleared local sign-in state.");
+      setBusy(false);
+      return;
+    }
+
     setStatus("Logging out...");
     try {
-      await logout(auth.accessToken);
-      setAuth(null);
-      setProfile(null);
-      setStatus("Logged out. Refresh cookie cleared.");
+      await logout();
+      clearSessionState();
+      setStatus("Logged out and cleared local session.");
     } catch (err) {
-      setError((err as Error).message);
+      setError(toUserMessage(err));
       setStatus(null);
     } finally {
       setBusy(false);
@@ -100,7 +118,7 @@ export default function App() {
         <h1>JobVault Auth Console</h1>
         <p>
           A focused workspace for testing JWT login, refresh, and logout. Tokens
-          never touch local storage, and refresh lives in a secure cookie.
+          are persisted in localStorage, and refresh lives in a secure cookie.
         </p>
       </section>
 
@@ -142,9 +160,11 @@ export default function App() {
 
         <div className="card">
           <h2>Session snapshot</h2>
-          <p className="mono">Access token (memory only)</p>
+          <p className="mono">Access token (localStorage)</p>
           <p className="mono">
-            {auth?.accessToken ? auth.accessToken.slice(0, 36) + "..." : "—"}
+            {(auth?.accessToken ?? getAccessToken())
+              ? (auth?.accessToken ?? getAccessToken())!.slice(0, 36) + "..."
+              : "—"}
           </p>
           <p className="mono">Expires at: {auth?.accessTokenExpiresAt ?? "—"}</p>
           <p className="mono">
@@ -161,8 +181,16 @@ export default function App() {
           <h2>Profile</h2>
           <p className="mono">User ID: {profile?.id ?? "—"}</p>
           <p className="mono">Roles: {profile?.roles?.join(", ") ?? "—"}</p>
-          {status && <div className="status">{status}</div>}
-          {error && <div className="status">{error}</div>}
+          {status && (
+            <div className="status" role="status" aria-live="polite" aria-atomic="true">
+              {status}
+            </div>
+          )}
+          {error && (
+            <div className="status" role="alert" aria-live="assertive" aria-atomic="true">
+              {error}
+            </div>
+          )}
         </div>
       </section>
     </div>
