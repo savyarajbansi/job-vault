@@ -5,6 +5,22 @@
       "type": "java.lang.String"
     },
     {
+      "name": "jobvault.parsing.max-pages",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "jobvault.parsing.max-text-bytes",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "jobvault.parsing.timeout-seconds",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "jobvault.parsing.skill-dictionary",
+      "type": "java.lang.String"
+    },
+    {
       "name": "jobvault.security.jwt.issuer",
       "type": "java.lang.String"
     },

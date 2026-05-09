@@ -29,6 +29,7 @@
     <properties>
         <java.version>25</java.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <pdfbox.version>3.0.3</pdfbox.version>
     </properties>
     <dependencies>
         <dependency>
@@ -71,6 +72,11 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
         </dependency>
 
         <dependency>

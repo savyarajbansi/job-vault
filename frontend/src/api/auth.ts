@@ -1,3 +1,4 @@
+import { request, sendRequest } from "./client";
 export type AuthUser = {
   id: string;
   roles: string[];
@@ -294,45 +295,3 @@ function authRecoveryError(): Error {
   return new Error(`${AUTH_RECOVERY_CODE}: ${AUTH_RECOVERY_MESSAGE}`);
 }
 
-async function request<T>(url: string, options: RequestInit): Promise<T> {
-  const { response, payload } = await sendRequest(url, options);
-  if (!response.ok) {
-    throwResponseError(response, payload);
-  }
-  return payload as T;
-}
-
-async function sendRequest(
-  url: string,
-  options: RequestInit
-): Promise<{ response: Response; payload: unknown }> {
-  const response = await fetch(url, options);
-  const text = await response.text();
-  const payload = parsePayload(response, text);
-  return { response, payload };
-}
-
-function parsePayload(response: Response, text: string): unknown {
-  if (!text) {
-    return null;
-  }
-
-  const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
-  const isJson = contentType.includes("application/json") || contentType.includes("+json");
-  if (!isJson) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function throwResponseError(response: Response, payload: unknown): never {
-  const body = payload as { code?: string; message?: string } | null;
-  const message = body?.message ?? response.statusText;
-  const code = body?.code ? `${body.code}: ${message}` : message;
-  throw new Error(code);
-}

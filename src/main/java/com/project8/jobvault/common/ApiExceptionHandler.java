@@ -2,6 +2,7 @@ package com.project8.jobvault.common;
 
 import com.project8.jobvault.auth.AuthErrorCodes;
 import com.project8.jobvault.auth.AuthErrorException;
+import com.project8.jobvault.parsing.ParseErrorException;
 import com.project8.jobvault.resumes.UploadErrorCodes;
 import com.project8.jobvault.resumes.UploadErrorException;
 import java.time.Clock;
@@ -43,6 +44,12 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(UploadErrorException.class)
     public ResponseEntity<ApiError> handleUploadError(UploadErrorException ex) {
+        ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), detailsOrEmpty(ex.getDetails()), clock.instant());
+        return ResponseEntity.status(resolveStatus(ex.getStatus())).body(error);
+    }
+
+    @ExceptionHandler(ParseErrorException.class)
+    public ResponseEntity<ApiError> handleParseError(ParseErrorException ex) {
         ApiError error = ApiError.of(ex.getCode(), ex.getMessage(), detailsOrEmpty(ex.getDetails()), clock.instant());
         return ResponseEntity.status(resolveStatus(ex.getStatus())).body(error);
     }

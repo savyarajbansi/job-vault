@@ -9,6 +9,7 @@ import com.project8.jobvault.notifications.NotificationType;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -88,7 +89,8 @@ public class SeekerApplicationController {
             application.setSeeker(seeker);
             application.setStatus(ApplicationStatus.SUBMITTED);
             application.setSubmittedAt(clock.instant());
-            saved = saveOrConflict(application);
+            JobApplication toSave = Objects.requireNonNull(application, "application");
+            saved = saveOrConflict(toSave);
         }
 
         UserAccount employer = job.getEmployer();
@@ -111,7 +113,8 @@ public class SeekerApplicationController {
 
     private JobApplication saveOrConflict(JobApplication application) {
         try {
-            return jobApplicationRepository.save(application);
+            JobApplication toSave = Objects.requireNonNull(application, "application");
+            return jobApplicationRepository.save(toSave);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Application already exists");
         }
@@ -121,7 +124,8 @@ public class SeekerApplicationController {
             UUID applicationId,
             UUID seekerId,
             String conflictReason) {
-        Optional<JobApplication> existing = jobApplicationRepository.findById(applicationId);
+        UUID resolvedApplicationId = Objects.requireNonNull(applicationId, "applicationId");
+        Optional<JobApplication> existing = jobApplicationRepository.findById(resolvedApplicationId);
         if (existing.isEmpty()) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
@@ -133,10 +137,14 @@ public class SeekerApplicationController {
     }
 
     private JobApplicationResponse toResponse(JobApplication application) {
+        Job job = Objects.requireNonNull(application.getJob(), "job");
+        UserAccount seeker = Objects.requireNonNull(application.getSeeker(), "seeker");
+        UUID jobId = Objects.requireNonNull(job.getId(), "jobId");
+        UUID seekerId = Objects.requireNonNull(seeker.getId(), "seekerId");
         return new JobApplicationResponse(
                 application.getId(),
-                application.getJob().getId(),
-                application.getSeeker().getId(),
+                jobId,
+                seekerId,
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),

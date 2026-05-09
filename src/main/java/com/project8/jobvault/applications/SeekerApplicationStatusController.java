@@ -1,9 +1,11 @@
 package com.project8.jobvault.applications;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -64,22 +66,29 @@ public class SeekerApplicationStatusController {
     }
 
     private ResponseStatusException resolveMissingOrConflict(UUID applicationId, UUID seekerId, String conflictReason) {
-        Optional<JobApplication> existing = jobApplicationRepository.findById(applicationId);
+        UUID resolvedApplicationId = Objects.requireNonNull(applicationId, "applicationId");
+        UUID resolvedSeekerId = Objects.requireNonNull(seekerId, "seekerId");
+        Optional<JobApplication> existing = jobApplicationRepository.findById(resolvedApplicationId);
         if (existing.isEmpty()) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
         JobApplication application = existing.get();
-        if (application.getSeeker() == null || !seekerId.equals(application.getSeeker().getId())) {
+        UUID existingSeekerId = application.getSeeker() == null ? null : application.getSeeker().getId();
+        if (existingSeekerId == null || !resolvedSeekerId.equals(existingSeekerId)) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
         return new ResponseStatusException(HttpStatus.CONFLICT, conflictReason);
     }
 
     private JobApplicationResponse toResponse(JobApplication application) {
+        Job job = Objects.requireNonNull(application.getJob(), "job");
+        UserAccount seeker = Objects.requireNonNull(application.getSeeker(), "seeker");
+        UUID jobId = Objects.requireNonNull(job.getId(), "jobId");
+        UUID seekerId = Objects.requireNonNull(seeker.getId(), "seekerId");
         return new JobApplicationResponse(
                 application.getId(),
-                application.getJob().getId(),
-                application.getSeeker().getId(),
+                jobId,
+                seekerId,
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),
@@ -87,10 +96,14 @@ public class SeekerApplicationStatusController {
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
-        return userAccountRepository.findById(principal.userId())
+        UUID userId = principal.userId();
+        if (userId == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
     }

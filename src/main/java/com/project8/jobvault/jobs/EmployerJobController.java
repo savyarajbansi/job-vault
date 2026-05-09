@@ -43,6 +43,7 @@ public class EmployerJobController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody JobCreateRequest request) {
         UserAccount employer = requireUser(principal);
+        Objects.requireNonNull(request, "request");
         Job job = new Job();
         job.setEmployer(employer);
         job.setTitle(request.title());
@@ -68,6 +69,7 @@ public class EmployerJobController {
             @PathVariable UUID jobId,
             @Valid @RequestBody JobUpdateRequest request) {
         UserAccount employer = requireUser(principal);
+        Objects.requireNonNull(request, "request");
         Optional<Job> ownedJob = findOwned(jobId, employer.getId());
         if (ownedJob.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -125,7 +127,8 @@ public class EmployerJobController {
     }
 
     private void throwNotFoundOrConflict(UUID jobId, UUID employerId, String conflictReason) {
-        Optional<Job> existing = jobRepository.findById(jobId);
+        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
+        Optional<Job> existing = jobRepository.findById(resolvedJobId);
         if (existing.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
         }

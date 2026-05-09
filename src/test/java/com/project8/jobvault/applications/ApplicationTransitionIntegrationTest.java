@@ -15,6 +15,7 @@ import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -40,7 +41,6 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -132,40 +132,45 @@ class ApplicationTransitionIntegrationTest {
         usersById.put(seekerUser.getId(), seekerUser);
         usersById.put(otherSeekerUser.getId(), otherSeekerUser);
 
-        when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
-            UUID userId = invocation.getArgument(0);
+        when(userAccountRepository.findById(nonNullArgument(UUID.class))).thenAnswer(invocation -> {
+            UUID userId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "userId");
             return Optional.ofNullable(usersById.get(userId));
         });
 
-        when(jobRepository.findByIdAndStatus(nonNullArgument(), nonNullArgument())).thenAnswer(invocation -> {
-            UUID jobId = invocation.getArgument(0);
-            JobStatus status = invocation.getArgument(1);
-            Job job = jobsById.get(jobId);
-            if (job == null || job.getStatus() != status) {
-                return Optional.empty();
-            }
-            return Optional.of(job);
-        });
+        when(jobRepository.findByIdAndStatus(nonNullArgument(UUID.class), nonNullArgument(JobStatus.class)))
+                .thenAnswer(invocation -> {
+                    UUID jobId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "jobId");
+                    JobStatus status = Objects.requireNonNull(invocation.getArgument(1, JobStatus.class), "status");
+                    Job job = jobsById.get(jobId);
+                    if (job == null || job.getStatus() != status) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(job);
+                });
 
-        when(jobApplicationRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
-            UUID applicationId = invocation.getArgument(0);
+        when(jobApplicationRepository.findById(nonNullArgument(UUID.class))).thenAnswer(invocation -> {
+            UUID applicationId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "applicationId");
             return Optional.ofNullable(applicationsById.get(applicationId));
         });
 
-        when(jobApplicationRepository.findByJobIdAndSeekerId(nonNullArgument(), nonNullArgument()))
+        when(jobApplicationRepository.findByJobIdAndSeekerId(
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class)))
                 .thenAnswer(invocation -> {
-                    UUID jobId = invocation.getArgument(0);
-                    UUID seekerId = invocation.getArgument(1);
+                    UUID jobId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "jobId");
+                    UUID seekerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "seekerId");
                     return applicationsById.values().stream()
                             .filter(app -> app.getJob().getId().equals(jobId))
                             .filter(app -> app.getSeeker().getId().equals(seekerId))
                             .findFirst();
                 });
 
-        when(jobApplicationRepository.findByIdAndJobEmployerId(nonNullArgument(), nonNullArgument()))
+        when(jobApplicationRepository.findByIdAndJobEmployerId(
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class)))
                 .thenAnswer(invocation -> {
-                    UUID appId = invocation.getArgument(0);
-                    UUID employerId = invocation.getArgument(1);
+                    UUID appId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "appId");
+                    UUID employerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "employerId");
                     JobApplication application = applicationsById.get(appId);
                     if (application == null || application.getJob().getEmployer() == null) {
                         return Optional.empty();
@@ -176,10 +181,12 @@ class ApplicationTransitionIntegrationTest {
                     return Optional.of(application);
                 });
 
-        when(jobApplicationRepository.findByIdAndSeekerId(nonNullArgument(), nonNullArgument()))
+        when(jobApplicationRepository.findByIdAndSeekerId(
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class)))
                 .thenAnswer(invocation -> {
-                    UUID appId = invocation.getArgument(0);
-                    UUID seekerId = invocation.getArgument(1);
+                    UUID appId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "appId");
+                    UUID seekerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "seekerId");
                     JobApplication application = applicationsById.get(appId);
                     if (application == null || application.getSeeker() == null) {
                         return Optional.empty();
@@ -190,12 +197,15 @@ class ApplicationTransitionIntegrationTest {
                     return Optional.of(application);
                 });
 
-        when(jobApplicationRepository.transitionDraftToSubmitted(nonNullArgument(), nonNullArgument(),
-                nonNullArgument()))
+        when(jobApplicationRepository.transitionDraftToSubmitted(
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class),
+                nonNullArgument(Instant.class)))
                 .thenAnswer(invocation -> {
-                    UUID jobId = invocation.getArgument(0);
-                    UUID seekerId = invocation.getArgument(1);
-                    Instant submittedAt = invocation.getArgument(2);
+                    UUID jobId = Objects.requireNonNull(invocation.getArgument(0, UUID.class), "jobId");
+                    UUID seekerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "seekerId");
+                    Instant submittedAt = Objects.requireNonNull(
+                            invocation.getArgument(2, Instant.class), "submittedAt");
                     Optional<JobApplication> application = applicationsById.values().stream()
                             .filter(app -> app.getJob().getId().equals(jobId))
                             .filter(app -> app.getSeeker().getId().equals(seekerId))
@@ -211,18 +221,21 @@ class ApplicationTransitionIntegrationTest {
                 });
 
         when(jobApplicationRepository.transitionForSeeker(
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class),
+                nonNullArgument(ApplicationStatus.class),
+                nonNullArgument(ApplicationStatus.class),
                 ArgumentMatchers.nullable(Instant.class),
                 ArgumentMatchers.nullable(Instant.class))).thenAnswer(invocation -> {
-                    UUID applicationId = invocation.getArgument(0);
-                    UUID seekerId = invocation.getArgument(1);
-                    ApplicationStatus expected = invocation.getArgument(2);
-                    ApplicationStatus newStatus = invocation.getArgument(3);
-                    Instant reviewedAt = invocation.getArgument(4);
-                    Instant decidedAt = invocation.getArgument(5);
+                    UUID applicationId = Objects.requireNonNull(invocation.getArgument(0, UUID.class),
+                            "applicationId");
+                    UUID seekerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "seekerId");
+                    ApplicationStatus expected = Objects.requireNonNull(
+                            invocation.getArgument(2, ApplicationStatus.class), "expected");
+                    ApplicationStatus newStatus = Objects.requireNonNull(
+                            invocation.getArgument(3, ApplicationStatus.class), "newStatus");
+                    Instant reviewedAt = invocation.getArgument(4, Instant.class);
+                    Instant decidedAt = invocation.getArgument(5, Instant.class);
                     JobApplication application = applicationsById.get(applicationId);
                     if (application == null || application.getSeeker() == null) {
                         return 0;
@@ -245,18 +258,21 @@ class ApplicationTransitionIntegrationTest {
                 });
 
         when(jobApplicationRepository.transitionForEmployer(
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class),
+                nonNullArgument(ApplicationStatus.class),
+                nonNullArgument(ApplicationStatus.class),
                 ArgumentMatchers.nullable(Instant.class),
                 ArgumentMatchers.nullable(Instant.class))).thenAnswer(invocation -> {
-                    UUID applicationId = invocation.getArgument(0);
-                    UUID employerId = invocation.getArgument(1);
-                    ApplicationStatus expected = invocation.getArgument(2);
-                    ApplicationStatus newStatus = invocation.getArgument(3);
-                    Instant reviewedAt = invocation.getArgument(4);
-                    Instant decidedAt = invocation.getArgument(5);
+                    UUID applicationId = Objects.requireNonNull(invocation.getArgument(0, UUID.class),
+                            "applicationId");
+                    UUID employerId = Objects.requireNonNull(invocation.getArgument(1, UUID.class), "employerId");
+                    ApplicationStatus expected = Objects.requireNonNull(
+                            invocation.getArgument(2, ApplicationStatus.class), "expected");
+                    ApplicationStatus newStatus = Objects.requireNonNull(
+                            invocation.getArgument(3, ApplicationStatus.class), "newStatus");
+                    Instant reviewedAt = invocation.getArgument(4, Instant.class);
+                    Instant decidedAt = invocation.getArgument(5, Instant.class);
                     JobApplication application = applicationsById.get(applicationId);
                     if (application == null || application.getJob().getEmployer() == null) {
                         return 0;
@@ -278,8 +294,9 @@ class ApplicationTransitionIntegrationTest {
                     return 1;
                 });
 
-        when(jobApplicationRepository.save(nonNullArgument())).thenAnswer(invocation -> {
-            JobApplication application = invocation.getArgument(0);
+        when(jobApplicationRepository.save(nonNullArgument(JobApplication.class))).thenAnswer(invocation -> {
+            JobApplication application = Objects.requireNonNull(invocation.getArgument(0, JobApplication.class),
+                    "application");
             if (application.getId() == null) {
                 application.setId(UUID.randomUUID());
             }
@@ -340,7 +357,7 @@ class ApplicationTransitionIntegrationTest {
         applicationsById.put(submitted.getId(), submitted);
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_001"));
@@ -397,20 +414,20 @@ class ApplicationTransitionIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_002"));
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(otherEmployerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"ACCEPTED\"}"))
                 .andExpect(status().isConflict());
 
@@ -425,14 +442,14 @@ class ApplicationTransitionIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"ACCEPTED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACCEPTED"));
@@ -446,27 +463,27 @@ class ApplicationTransitionIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"REJECTED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REJECTED"));
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"REJECTED\"}"))
                 .andExpect(status().isConflict());
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"ACCEPTED\"}"))
                 .andExpect(status().isConflict());
 
@@ -481,7 +498,7 @@ class ApplicationTransitionIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"UNDER_REVIEW\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
@@ -497,7 +514,7 @@ class ApplicationTransitionIntegrationTest {
 
         mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", submitted.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"REJECTED\"}"))
                 .andExpect(status().isConflict());
 
@@ -509,7 +526,7 @@ class ApplicationTransitionIntegrationTest {
         Job job = buildActiveJob();
         doThrow(new DataIntegrityViolationException("uq_applications_job_seeker"))
                 .when(jobApplicationRepository)
-                .save(ArgumentMatchers.any(JobApplication.class));
+                .save(nonNullArgument(JobApplication.class));
 
         mockMvc.perform(post("/api/seeker/jobs/{jobId}/draft", job.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
@@ -521,7 +538,7 @@ class ApplicationTransitionIntegrationTest {
         Job job = buildActiveJob();
         doThrow(new DataIntegrityViolationException("uq_applications_job_seeker"))
                 .when(jobApplicationRepository)
-                .save(ArgumentMatchers.any(JobApplication.class));
+                .save(nonNullArgument(JobApplication.class));
 
         mockMvc.perform(post("/api/seeker/jobs/{jobId}/apply", job.getId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
@@ -537,10 +554,10 @@ class ApplicationTransitionIntegrationTest {
         CountDownLatch updateStart = new CountDownLatch(2);
         AtomicInteger updateWinner = new AtomicInteger(0);
         when(jobApplicationRepository.transitionForEmployer(
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
-                nonNullArgument(),
+                nonNullArgument(UUID.class),
+                nonNullArgument(UUID.class),
+                nonNullArgument(ApplicationStatus.class),
+                nonNullArgument(ApplicationStatus.class),
                 ArgumentMatchers.nullable(Instant.class),
                 ArgumentMatchers.nullable(Instant.class))).thenAnswer(invocation -> {
                     updateStart.countDown();
@@ -549,11 +566,15 @@ class ApplicationTransitionIntegrationTest {
                         return 0;
                     }
                     if (updateWinner.compareAndSet(0, 1)) {
-                        UUID applicationId = invocation.getArgument(0);
-                        Instant reviewedAt = invocation.getArgument(4);
-                        JobApplication application = applicationsById.get(applicationId);
+                        UUID applicationId = Objects.requireNonNull(invocation.getArgument(0, UUID.class),
+                                "applicationId");
+                        Instant reviewedAt = invocation.getArgument(4, Instant.class);
+                        JobApplication application = Objects.requireNonNull(applicationsById.get(applicationId),
+                                "application");
                         application.setStatus(ApplicationStatus.UNDER_REVIEW);
-                        application.setReviewedAt(reviewedAt);
+                        if (reviewedAt != null) {
+                            application.setReviewedAt(reviewedAt);
+                        }
                         applicationsById.put(applicationId, application);
                         return 1;
                     }
@@ -579,13 +600,14 @@ class ApplicationTransitionIntegrationTest {
         AtomicInteger saveCalls = new AtomicInteger(0);
         ConcurrentLinkedQueue<ApplicationStatus> savedStatuses = new ConcurrentLinkedQueue<>();
 
-        when(jobApplicationRepository.save(any(JobApplication.class))).thenAnswer(invocation -> {
+        when(jobApplicationRepository.save(nonNullArgument(JobApplication.class))).thenAnswer(invocation -> {
             createStart.countDown();
             boolean started = createStart.await(5, TimeUnit.SECONDS);
             if (!started) {
                 throw new IllegalStateException("create race setup timed out");
             }
-            JobApplication application = invocation.getArgument(0);
+            JobApplication application = Objects.requireNonNull(invocation.getArgument(0, JobApplication.class),
+                    "application");
             int saveAttempt = saveCalls.incrementAndGet();
             if (saveAttempt > 1) {
                 throw new DataIntegrityViolationException("uq_applications_job_seeker");
@@ -619,12 +641,16 @@ class ApplicationTransitionIntegrationTest {
             String statusValue) throws Exception {
         MvcResult result = mockMvc.perform(patch("/api/employer/applications/{applicationId}/status", applicationId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(user))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(jsonContentType())
                 .content("{\"status\":\"" + statusValue + "\"}"))
                 .andReturn();
         return DeterministicConcurrencyHarness.ContentionResponse.of(
                 result.getResponse().getStatus(),
                 result.getResponse().getContentAsString());
+    }
+
+    private static @NonNull MediaType jsonContentType() {
+        return Objects.requireNonNull(MediaType.APPLICATION_JSON, "applicationJson");
     }
 
     private DeterministicConcurrencyHarness.ContentionResponse postSeekerJobAction(
@@ -672,8 +698,8 @@ class ApplicationTransitionIntegrationTest {
 
     @NonNull
     @SuppressWarnings("null")
-    private static <T> T nonNullArgument() {
-        return ArgumentMatchers.notNull();
+    private static <T> T nonNullArgument(Class<T> type) {
+        return ArgumentMatchers.notNull(type);
     }
 
     private Role buildRole(String name) {

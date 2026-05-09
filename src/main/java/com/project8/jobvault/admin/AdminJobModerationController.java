@@ -10,6 +10,7 @@ import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -46,12 +47,13 @@ public class AdminJobModerationController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount admin = requireUser(principal);
+        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
         Instant now = clock.instant();
-        int rows = jobRepository.approveForAdmin(jobId, admin, now, now);
+        int rows = jobRepository.approveForAdmin(resolvedJobId, admin, now, now);
         if (rows == 0) {
-            throw resolveMissingOrConflict(jobId);
+            throw resolveMissingOrConflict(resolvedJobId);
         }
-        Job updated = jobRepository.findById(jobId)
+        Job updated = jobRepository.findById(resolvedJobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(updated));
     }
@@ -80,19 +82,22 @@ public class AdminJobModerationController {
             AdminJobModerationRequest request,
             JobModerationAction action) {
         UserAccount admin = requireUser(principal);
+        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
         Instant now = clock.instant();
-        String reason = request.moderationReason().trim();
-        int rows = jobRepository.moderateActiveToDisabled(jobId, action, reason, admin, now, now);
+        Objects.requireNonNull(request, "request");
+        String reason = Objects.requireNonNull(request.moderationReason(), "moderationReason").trim();
+        int rows = jobRepository.moderateActiveToDisabled(resolvedJobId, action, reason, admin, now, now);
         if (rows == 0) {
-            throw resolveMissingOrConflict(jobId);
+            throw resolveMissingOrConflict(resolvedJobId);
         }
-        Job updated = jobRepository.findById(jobId)
+        Job updated = jobRepository.findById(resolvedJobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(updated));
     }
 
     private ResponseStatusException resolveMissingOrConflict(UUID jobId) {
-        Optional<Job> existing = jobRepository.findById(jobId);
+        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
+        Optional<Job> existing = jobRepository.findById(resolvedJobId);
         if (existing.isEmpty()) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
         }
@@ -104,10 +109,14 @@ public class AdminJobModerationController {
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
-        if (principal == null || principal.userId() == null) {
+        if (principal == null) {
             throw new BadCredentialsException("Invalid authentication");
         }
-        return userAccountRepository.findById(principal.userId())
+        UUID userId = principal.userId();
+        if (userId == null) {
+            throw new BadCredentialsException("Invalid authentication");
+        }
+        return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
     }

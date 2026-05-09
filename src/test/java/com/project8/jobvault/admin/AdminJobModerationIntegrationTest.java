@@ -16,6 +16,7 @@ import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -243,6 +244,7 @@ class AdminJobModerationIntegrationTest {
         assertEquals(JobStatus.ACTIVE, updated.getStatus());
         assertEquals(JobModerationAction.APPROVED, updated.getModerationAction());
         assertNotNull(updated.getModeratedAt());
+        assertNotNull(updated.getModeratedBy());
         assertEquals(adminUser.getId(), updated.getModeratedBy().getId());
         assertNull(updated.getModerationReason());
     }
@@ -259,7 +261,8 @@ class AdminJobModerationIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(adminUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.disabledAt").value(nullValue()));
+                .andExpect(jsonPath("$.disabledAt")
+                        .value(Objects.requireNonNull(nullValue(Object.class), "disabledAtNull")));
 
         Job updated = jobsById.get(disabledJob.getId());
         assertEquals(JobStatus.ACTIVE, updated.getStatus());
@@ -285,6 +288,7 @@ class AdminJobModerationIntegrationTest {
         assertEquals(JobModerationAction.REJECTED, updated.getModerationAction());
         assertEquals("Policy violation", updated.getModerationReason());
         assertNotNull(updated.getModeratedAt());
+        assertNotNull(updated.getModeratedBy());
         assertEquals(adminUser.getId(), updated.getModeratedBy().getId());
     }
 

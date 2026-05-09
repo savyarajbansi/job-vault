@@ -5,3 +5,31 @@ spring:
     username: YOUR_DB_USERNAME
     password: YOUR_DB_PASSWORD
     driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  mvc:
+    cors:
+      allowed-origins:
+        - http://localhost:5173
+      allowed-methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed-headers:
+        - Authorization
+        - Content-Type
+        - Accept
+        - Origin
+        - X-CSRF-Token
+      allow-credentials: true
+      max-age: 3600
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB

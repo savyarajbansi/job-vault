@@ -2,6 +2,8 @@ package com.project8.jobvault.common;
 
 import com.project8.jobvault.auth.AuthErrorCodes;
 import com.project8.jobvault.auth.AuthErrorException;
+import com.project8.jobvault.parsing.ParseErrorCodes;
+import com.project8.jobvault.parsing.ParseErrorException;
 import com.project8.jobvault.resumes.UploadErrorCodes;
 import com.project8.jobvault.resumes.UploadErrorException;
 import java.time.Clock;
@@ -50,6 +52,20 @@ class ApiExceptionHandlerTest {
                 HttpStatus.INTERNAL_SERVER_ERROR);
 
         ApiError error = handler.handleUploadError(ex).getBody();
+        assertNotNull(error);
+        assertNotNull(error.details());
+        assertTrue(error.details().isEmpty());
+    }
+
+    @Test
+    void defaultsParseErrorDetailsToEmptyMap() {
+        ApiExceptionHandler handler = new ApiExceptionHandler(clock);
+        ParseErrorException ex = new ParseErrorException(
+                ParseErrorCodes.PARSE_FAILED,
+                ParseErrorCodes.MESSAGE_PARSE_FAILED,
+                HttpStatus.UNPROCESSABLE_ENTITY);
+
+        ApiError error = handler.handleParseError(ex).getBody();
         assertNotNull(error);
         assertNotNull(error.details());
         assertTrue(error.details().isEmpty());

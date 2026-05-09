@@ -39,6 +39,11 @@ spring:
 jobvault:
   storage:
     resumes-dir: ${JOBVAULT_RESUMES_DIR:storage/resumes}
+  parsing:
+    max-pages: 20
+    max-text-bytes: 2097152
+    timeout-seconds: 5
+    skill-dictionary: classpath:skills/skill-dictionary.txt
   security:
     jwt:
       issuer: JobVault

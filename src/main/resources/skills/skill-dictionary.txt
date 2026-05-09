@@ -1,0 +1,11 @@
+# Canonical skill and optional synonyms separated by pipes.
+java|java 8|java 11|java 17
+spring|spring framework
+spring boot|springboot
+sql|postgres|postgresql|mysql
+javascript|js
+typescript|ts
+react|react.js
+python
+aws|amazon web services
+docker|kubernetes|k8s

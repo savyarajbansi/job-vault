@@ -1,6 +1,7 @@
 package com.project8.jobvault.applications;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.notifications.NotificationService;
 import com.project8.jobvault.notifications.NotificationType;
 import com.project8.jobvault.users.UserAccount;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -53,7 +55,8 @@ public class EmployerApplicationController {
             @PathVariable UUID applicationId,
             @Valid @RequestBody ApplicationStatusUpdateRequest request) {
         UserAccount employer = requireUser(principal);
-        ApplicationStatus newStatus = request.status();
+        Objects.requireNonNull(request, "request");
+        ApplicationStatus newStatus = Objects.requireNonNull(request.status(), "status");
         if (!EMPLOYER_STATUSES.contains(newStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported status change");
         }
@@ -78,13 +81,14 @@ public class EmployerApplicationController {
         JobApplication saved = jobApplicationRepository.findByIdAndJobEmployerId(applicationId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
 
+        Job job = Objects.requireNonNull(saved.getJob(), "job");
         UserAccount seeker = saved.getSeeker();
         if (seeker != null) {
             String statusLabel = newStatus.name().replace('_', ' ').toLowerCase();
             notificationService.createNotification(
                     seeker,
                     NotificationType.APPLICATION_STATUS_CHANGED,
-                    "Your application for " + saved.getJob().getTitle() + " is now " + statusLabel);
+                    "Your application for " + job.getTitle() + " is now " + statusLabel);
         }
 
         return ResponseEntity.ok(toResponse(saved));
@@ -94,24 +98,30 @@ public class EmployerApplicationController {
             UUID applicationId,
             UUID employerId,
             String conflictReason) {
-        Optional<JobApplication> existing = jobApplicationRepository.findById(applicationId);
+        UUID resolvedApplicationId = Objects.requireNonNull(applicationId, "applicationId");
+        UUID resolvedEmployerId = Objects.requireNonNull(employerId, "employerId");
+        Optional<JobApplication> existing = jobApplicationRepository.findById(resolvedApplicationId);
         if (existing.isEmpty()) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
         JobApplication application = existing.get();
         if (application.getJob() == null
                 || application.getJob().getEmployer() == null
-                || !employerId.equals(application.getJob().getEmployer().getId())) {
+                || !resolvedEmployerId.equals(application.getJob().getEmployer().getId())) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
         return new ResponseStatusException(HttpStatus.CONFLICT, conflictReason);
     }
 
     private JobApplicationResponse toResponse(JobApplication application) {
+        Job job = Objects.requireNonNull(application.getJob(), "job");
+        UserAccount seeker = Objects.requireNonNull(application.getSeeker(), "seeker");
+        UUID jobId = Objects.requireNonNull(job.getId(), "jobId");
+        UUID seekerId = Objects.requireNonNull(seeker.getId(), "seekerId");
         return new JobApplicationResponse(
                 application.getId(),
-                application.getJob().getId(),
-                application.getSeeker().getId(),
+                jobId,
+                seekerId,
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),
