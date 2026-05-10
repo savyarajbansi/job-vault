@@ -1,4 +1,4 @@
-import { request, sendRequest } from "./client";
+import { request, sendRequest, throwResponseError } from "./client";
 export type AuthUser = {
   id: string;
   roles: string[];
