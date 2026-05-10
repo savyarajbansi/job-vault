@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/api/auth.test.ts","./src/api/auth.ts","./src/api/client.test.ts","./src/api/client.ts","./src/layout/applayout.tsx","./src/routes/authconsole.tsx","./src/routes/home.tsx","./src/routes/notfound.tsx"],"errors":true,"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/auth.test.ts","./src/api/auth.ts","./src/api/client.test.ts","./src/api/client.ts","./src/layout/applayout.tsx","./src/routes/authconsole.tsx","./src/routes/home.tsx","./src/routes/notfound.tsx"],"version":"5.9.3"}

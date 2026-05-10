@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project8.jobvault.applications.JobApplicationRepository;
 import com.project8.jobvault.auth.JwtTokenService;
 import com.project8.jobvault.auth.RefreshTokenRepository;
+import com.project8.jobvault.parsing.ParseErrorCodes;
+import com.project8.jobvault.parsing.ParseErrorException;
+import com.project8.jobvault.parsing.ParseResult;
+import com.project8.jobvault.parsing.ResumeParser;
 import com.project8.jobvault.jobs.EmployerJobController;
 import com.project8.jobvault.jobs.JobRepository;
 import com.project8.jobvault.jobs.PublicJobController;
@@ -17,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +31,7 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.lang.NonNull;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,6 +77,9 @@ class ResumeUploadIntegrationTest {
 
     @MockitoBean
     private ResumeStorageService resumeStorageService;
+
+    @MockitoBean
+    private ResumeParser resumeParser;
 
     @MockitoBean
     private UserAccountRepository userAccountRepository;
@@ -130,6 +139,9 @@ class ResumeUploadIntegrationTest {
                     UUID resumeId = invocation.getArgument(0);
                     return "storage/resumes/" + resumeId + ".pdf";
                 });
+
+        when(resumeParser.parse(nonNullArgument()))
+                .thenReturn(new ParseResult("Java Spring developer", List.of("java", "spring")));
     }
 
     @Test
@@ -145,13 +157,16 @@ class ResumeUploadIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resumeId").exists())
-                .andExpect(jsonPath("$.status").value("UPLOADED"))
+                .andExpect(jsonPath("$.status").value("PARSED"))
                 .andReturn();
 
         JsonNode node = objectMapper.readTree(result.getResponse().getContentAsByteArray());
         UUID resumeId = UUID.fromString(node.path("resumeId").asText());
         ResumeMetadata metadata = resumesById.get(resumeId);
         org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        assertEquals("Java Spring developer", metadata.getParsedText());
+        assertEquals("java,spring", metadata.getInferredSkills());
+        assertEquals(ResumeProcessingStatus.PARSED, metadata.getProcessingStatus());
     }
 
     @Test
@@ -234,6 +249,34 @@ class ResumeUploadIntegrationTest {
                 .file(file))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR_AUTH_001"));
+    }
+
+    @Test
+    void parseFailureMarksResumeAsFailedAndReturnsStableError() throws Exception {
+        when(resumeParser.parse(nonNullArgument()))
+                .thenThrow(new ParseErrorException(
+                        ParseErrorCodes.PARSE_FAILED,
+                        ParseErrorCodes.MESSAGE_PARSE_FAILED,
+                        HttpStatus.UNPROCESSABLE_ENTITY));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "resume.pdf",
+                "application/pdf",
+                "resume content".getBytes());
+
+        mockMvc.perform(multipart("/api/seeker/resumes/upload")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(ParseErrorCodes.PARSE_FAILED));
+
+        ResumeMetadata metadata = resumesById.values().stream()
+                .filter(item -> item.getProcessingStatus() == ResumeProcessingStatus.FAILED)
+                .findFirst()
+                .orElse(null);
+        org.junit.jupiter.api.Assertions.assertNotNull(metadata);
+        assertEquals(ParseErrorCodes.PARSE_FAILED, metadata.getFailureCode());
     }
 
     private String issueToken(UserAccount user) {
