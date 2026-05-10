@@ -1,5 +1,6 @@
 package com.project8.jobvault.jobs;
 
+import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.users.UserAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,9 +10,13 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -34,6 +39,13 @@ public class Job {
 
     @Column(nullable = false, columnDefinition = "text")
     private String description;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "job_required_skills",
+            joinColumns = @JoinColumn(name = "job_id"),
+            inverseJoinColumns = @JoinColumn(name = "skill_id"))
+    private Set<Skill> requiredSkills = new LinkedHashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -100,6 +112,14 @@ public class Job {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Set<Skill> getRequiredSkills() {
+        return requiredSkills;
+    }
+
+    public void setRequiredSkills(Set<Skill> requiredSkills) {
+        this.requiredSkills = requiredSkills;
     }
 
     public JobStatus getStatus() {

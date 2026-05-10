@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -27,14 +28,17 @@ import org.springframework.web.server.ResponseStatusException;
 public class EmployerJobController {
     private final JobRepository jobRepository;
     private final UserAccountRepository userAccountRepository;
+    private final ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider;
     private final Clock clock;
 
     public EmployerJobController(
             JobRepository jobRepository,
             UserAccountRepository userAccountRepository,
+            ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
+        this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
         this.clock = clock;
     }
 
@@ -81,6 +85,7 @@ public class EmployerJobController {
         job.setTitle(request.title());
         job.setDescription(request.description());
         Job saved = jobRepository.save(job);
+        syncRequiredSkills(saved);
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -95,6 +100,7 @@ public class EmployerJobController {
         }
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        syncRequiredSkills(saved);
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -109,6 +115,7 @@ public class EmployerJobController {
         }
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        syncRequiredSkills(saved);
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -161,6 +168,10 @@ public class EmployerJobController {
         return userAccountRepository.findById(userId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("Invalid authentication"));
+    }
+
+    private void syncRequiredSkills(Job job) {
+        jobRequiredSkillSyncServiceProvider.ifAvailable(service -> service.syncRequiredSkills(job));
     }
 
     private JobDetailResponse toDetail(Job job) {

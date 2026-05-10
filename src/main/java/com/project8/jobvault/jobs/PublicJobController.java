@@ -1,8 +1,11 @@
 package com.project8.jobvault.jobs;
 
+import com.project8.jobvault.skills.SkillRepository;
+import com.project8.jobvault.skills.TrendingSkillResponse;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,9 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/jobs")
 public class PublicJobController {
     private final JobRepository jobRepository;
+    private final ObjectProvider<SkillRepository> skillRepositoryProvider;
 
-    public PublicJobController(JobRepository jobRepository) {
+    public PublicJobController(
+            JobRepository jobRepository,
+            ObjectProvider<SkillRepository> skillRepositoryProvider) {
         this.jobRepository = jobRepository;
+        this.skillRepositoryProvider = skillRepositoryProvider;
     }
 
     @GetMapping
@@ -42,5 +49,19 @@ public class PublicJobController {
                 value.getPublishedAt(),
                 value.getDisabledAt())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/trending-skills")
+    public List<TrendingSkillResponse> trendingSkills() {
+        SkillRepository skillRepository = skillRepositoryProvider.getIfAvailable();
+        if (skillRepository == null) {
+            return List.of();
+        }
+        return skillRepository.findTrendingSkills().stream()
+                .map(row -> new TrendingSkillResponse(
+                        row.getSkillId(),
+                        row.getSkillName(),
+                        row.getScore() == null ? 0.0 : row.getScore().doubleValue()))
+                .toList();
     }
 }

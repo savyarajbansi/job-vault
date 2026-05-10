@@ -1,13 +1,19 @@
 package com.project8.jobvault.resumes;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.parsing.ParseErrorException;
+import com.project8.jobvault.parsing.ParseResult;
+import com.project8.jobvault.parsing.ResumeParser;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
+import java.time.Clock;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,16 +35,22 @@ public class ResumeUploadController {
     private final ResumeMetadataRepository resumeMetadataRepository;
     private final UserAccountRepository userAccountRepository;
     private final ResumeStorageService storageService;
+    private final ResumeParser resumeParser;
+    private final Clock clock;
     private final DataSize maxFileSize;
 
     public ResumeUploadController(
             ResumeMetadataRepository resumeMetadataRepository,
             UserAccountRepository userAccountRepository,
             ResumeStorageService storageService,
+            ResumeParser resumeParser,
+            Clock clock,
             @Value("${spring.servlet.multipart.max-file-size:10MB}") DataSize maxFileSize) {
         this.resumeMetadataRepository = resumeMetadataRepository;
         this.userAccountRepository = userAccountRepository;
         this.storageService = storageService;
+        this.resumeParser = resumeParser;
+        this.clock = clock;
         this.maxFileSize = maxFileSize;
     }
 
@@ -60,7 +72,23 @@ public class ResumeUploadController {
         try {
             String storageLocation = storageService.store(saved.getId(), file);
             saved.setStorageLocation(storageLocation);
+            saved.setStorageType("LOCAL_DISK");
+            saved.setStorageKey(storageLocation);
+            saved.setProcessingStatus(ResumeProcessingStatus.PARSING);
             resumeMetadataRepository.save(saved);
+
+            ParseResult result = resumeParser.parse(file.getBytes());
+            saved.setParsedText(result.extractedText());
+            saved.setInferredSkills(joinSkills(result.inferredSkills()));
+            saved.setParsedAt(clock.instant());
+            saved.setFailureCode(null);
+            saved.setProcessingStatus(ResumeProcessingStatus.PARSED);
+            saved = resumeMetadataRepository.save(saved);
+        } catch (ParseErrorException ex) {
+            saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
+            saved.setFailureCode(ex.getCode());
+            resumeMetadataRepository.save(saved);
+            throw ex;
         } catch (IOException ex) {
             saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
             saved.setFailureCode(UploadErrorCodes.UPLOAD_FAILED);
@@ -134,5 +162,16 @@ public class ResumeUploadController {
             return "resume.pdf";
         }
         return filename.trim();
+    }
+
+    private String joinSkills(List<String> inferredSkills) {
+        if (inferredSkills == null || inferredSkills.isEmpty()) {
+            return "";
+        }
+        return inferredSkills.stream()
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .collect(Collectors.joining(","));
     }
 }

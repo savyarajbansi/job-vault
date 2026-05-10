@@ -41,12 +41,24 @@ public class ResumeMetadata {
     @Column(name = "storage_location", length = 500)
     private String storageLocation;
 
+    @Column(name = "storage_type", length = 50)
+    private String storageType;
+
+    @Column(name = "storage_key", length = 500)
+    private String storageKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "processing_status", nullable = false, length = 20)
     private ResumeProcessingStatus processingStatus = ResumeProcessingStatus.UPLOADED;
 
     @Column(name = "failure_code", length = 50)
     private String failureCode;
+
+    @Column(name = "parsed_text", columnDefinition = "text")
+    private String parsedText;
+
+    @Column(name = "inferred_skills", columnDefinition = "text")
+    private String inferredSkills;
 
     @Column(name = "parsed_at")
     private Instant parsedAt;
@@ -126,6 +138,22 @@ public class ResumeMetadata {
         this.failureCode = failureCode;
     }
 
+    public String getParsedText() {
+        return parsedText;
+    }
+
+    public void setParsedText(String parsedText) {
+        this.parsedText = parsedText;
+    }
+
+    public String getInferredSkills() {
+        return inferredSkills;
+    }
+
+    public void setInferredSkills(String inferredSkills) {
+        this.inferredSkills = inferredSkills;
+    }
+
     public Instant getParsedAt() {
         return parsedAt;
     }
@@ -140,5 +168,21 @@ public class ResumeMetadata {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getStorageType() {
+        return storageType;
+    }
+
+    public void setStorageType(String storageType) {
+        this.storageType = storageType;
+    }
+
+    public String getStorageKey() {
+        return storageKey;
+    }
+
+    public void setStorageKey(String storageKey) {
+        this.storageKey = storageKey;
     }
 }
