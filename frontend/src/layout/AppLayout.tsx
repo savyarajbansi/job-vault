@@ -19,6 +19,9 @@ export default function AppLayout() {
           <NavLink to="/auth" className={navLinkClass}>
             Auth Console
           </NavLink>
+          <NavLink to="/seeker" className={navLinkClass}>
+            Seeker Workspace
+          </NavLink>
         </nav>
       </header>
       <main className="app-main">

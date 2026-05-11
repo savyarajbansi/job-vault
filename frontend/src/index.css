@@ -199,6 +199,16 @@ input {
   font-size: 1rem;
 }
 
+select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  font-family: inherit;
+  font-size: 1rem;
+  background: white;
+}
+
 button {
   border: none;
   background: var(--accent);
@@ -244,6 +254,35 @@ button:disabled {
   border-radius: 12px;
   color: #7c3d2c;
   font-size: 0.95rem;
+}
+
+.status-success {
+  background: #ecf9f0;
+  border-color: #b9e8c7;
+  color: #18572e;
+}
+
+.status-error {
+  background: #ffefef;
+  border-color: #f5caca;
+  color: #7f1d1d;
+}
+
+.seeker-grid {
+  align-items: start;
+}
+
+.seeker-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.seeker-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
 }
 
 @media (max-width: 720px) {

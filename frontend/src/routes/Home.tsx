@@ -13,6 +13,9 @@ export default function Home() {
           <Link className="cta" to="/auth">
             Open auth console
           </Link>
+          <Link className="cta secondary" to="/seeker">
+            Open seeker workspace
+          </Link>
           <a className="cta secondary" href="/api" rel="noreferrer">
             Backend health
           </a>
@@ -25,6 +28,10 @@ export default function Home() {
           <p>
             Resume upload, profile extraction, and ranked job matches land here.
             Align UI states with parsing + matching API responses.
+          </p>
+          <p>
+            Start from the <Link to="/seeker">Seeker Workspace</Link> route to run
+            upload, match, and skill-gap flows end-to-end.
           </p>
         </div>
         <div className="card">
