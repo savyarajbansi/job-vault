@@ -31,6 +31,9 @@ public class PublicJobController {
                 .map(job -> new JobSummaryResponse(
                         job.getId(),
                         job.getTitle(),
+                        job.getLocation(),
+                        job.getRemoteEligible(),
+                        job.getMinExperienceYears(),
                         job.getStatus(),
                         job.getCreatedAt()))
                 .toList();
@@ -43,6 +46,9 @@ public class PublicJobController {
                 value.getId(),
                 value.getTitle(),
                 value.getDescription(),
+                value.getLocation(),
+                value.getRemoteEligible(),
+                value.getMinExperienceYears(),
                 value.getStatus(),
                 value.getCreatedAt(),
                 value.getUpdatedAt(),

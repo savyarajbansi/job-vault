@@ -40,6 +40,15 @@ public class Job {
     @Column(nullable = false, columnDefinition = "text")
     private String description;
 
+    @Column(name = "location", length = 150)
+    private String location;
+
+    @Column(name = "remote_eligible")
+    private Boolean remoteEligible;
+
+    @Column(name = "min_experience_years")
+    private Integer minExperienceYears;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "job_required_skills",
@@ -112,6 +121,30 @@ public class Job {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public Boolean getRemoteEligible() {
+        return remoteEligible;
+    }
+
+    public void setRemoteEligible(Boolean remoteEligible) {
+        this.remoteEligible = remoteEligible;
+    }
+
+    public Integer getMinExperienceYears() {
+        return minExperienceYears;
+    }
+
+    public void setMinExperienceYears(Integer minExperienceYears) {
+        this.minExperienceYears = minExperienceYears;
     }
 
     public Set<Skill> getRequiredSkills() {

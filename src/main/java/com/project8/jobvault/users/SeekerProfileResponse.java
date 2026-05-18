@@ -4,5 +4,8 @@ import java.util.UUID;
 
 public record SeekerProfileResponse(
         UUID userId,
-        String preferredSector) {
+        String preferredSector,
+        String preferredLocation,
+        Boolean remoteOk,
+        Integer yearsExperience) {
 }

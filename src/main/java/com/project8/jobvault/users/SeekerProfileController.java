@@ -33,12 +33,20 @@ public class SeekerProfileController {
             @Valid @RequestBody SeekerProfileRequest request) {
         UserAccount user = requireUser(principal);
         user.setPreferredSector(normalizeSector(request.preferredSector()));
+        user.setPreferredLocation(normalizeLocation(request.preferredLocation()));
+        user.setRemoteOk(request.remoteOk());
+        user.setYearsExperience(request.yearsExperience());
         UserAccount saved = userAccountRepository.save(user);
         return ResponseEntity.ok(toResponse(saved));
     }
 
     private SeekerProfileResponse toResponse(UserAccount user) {
-        return new SeekerProfileResponse(user.getId(), user.getPreferredSector());
+        return new SeekerProfileResponse(
+                user.getId(),
+                user.getPreferredSector(),
+                user.getPreferredLocation(),
+                user.getRemoteOk(),
+                user.getYearsExperience());
     }
 
     private String normalizeSector(String sector) {
@@ -46,6 +54,14 @@ public class SeekerProfileController {
             return null;
         }
         String trimmed = sector.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeLocation(String location) {
+        if (location == null) {
+            return null;
+        }
+        String trimmed = location.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 

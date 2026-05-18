@@ -229,10 +229,21 @@ class EmployerJobIntegrationTest {
         MvcResult createResult = mockMvc.perform(post("/api/employer/jobs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
-                .content("{\"title\":\"Backend Engineer\",\"description\":\"Build APIs\"}"))
+                .content("""
+                        {
+                          "title":"Backend Engineer",
+                          "description":"Build APIs",
+                          "location":"Kathmandu",
+                          "remoteEligible":true,
+                          "minExperienceYears":3
+                        }
+                        """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.location").value("Kathmandu"))
+                .andExpect(jsonPath("$.remoteEligible").value(true))
+                .andExpect(jsonPath("$.minExperienceYears").value(3))
                 .andReturn();
 
         UUID jobId = extractJobId(createResult);
@@ -262,10 +273,39 @@ class EmployerJobIntegrationTest {
         mockMvc.perform(patch("/api/employer/jobs/{id}", jobId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
-                .content("{\"title\":\"Senior Backend Engineer\",\"description\":\"Build APIs v2\"}"))
+                .content("""
+                        {
+                          "title":"Senior Backend Engineer",
+                          "description":"Build APIs v2",
+                          "location":"  Pokhara  ",
+                          "remoteEligible":false,
+                          "minExperienceYears":5
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Senior Backend Engineer"))
-                .andExpect(jsonPath("$.description").value("Build APIs v2"));
+                .andExpect(jsonPath("$.description").value("Build APIs v2"))
+                .andExpect(jsonPath("$.location").value("Pokhara"))
+                .andExpect(jsonPath("$.remoteEligible").value(false))
+                .andExpect(jsonPath("$.minExperienceYears").value(5));
+    }
+
+    @Test
+    void employerJobValidationRejectsOutOfRangeMinExperienceYears() throws Exception {
+        mockMvc.perform(post("/api/employer/jobs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "title":"Backend Engineer",
+                          "description":"Build APIs",
+                          "minExperienceYears":61
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.details.reason").value("validation_failed"))
+                .andExpect(jsonPath("$.details.fields.minExperienceYears").exists());
     }
 
     @Test
@@ -391,13 +431,19 @@ class EmployerJobIntegrationTest {
     void publicJobsOnlyReturnActive() throws Exception {
         Job draft = buildJob(employerUser, JobStatus.DRAFT);
         Job published = buildJob(employerUser, JobStatus.ACTIVE);
+        published.setLocation("Lalitpur");
+        published.setRemoteEligible(true);
+        published.setMinExperienceYears(4);
         jobsById.put(draft.getId(), draft);
         jobsById.put(published.getId(), published);
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(published.getId().toString()));
+                .andExpect(jsonPath("$[0].id").value(published.getId().toString()))
+                .andExpect(jsonPath("$[0].location").value("Lalitpur"))
+                .andExpect(jsonPath("$[0].remoteEligible").value(true))
+                .andExpect(jsonPath("$[0].minExperienceYears").value(4));
     }
 
     @Test
@@ -407,6 +453,21 @@ class EmployerJobIntegrationTest {
 
         mockMvc.perform(get("/api/jobs/{id}", draft.getId()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void publicJobDetailsIncludeExplicitMatchingFields() throws Exception {
+        Job published = buildJob(employerUser, JobStatus.ACTIVE);
+        published.setLocation("Kathmandu");
+        published.setRemoteEligible(false);
+        published.setMinExperienceYears(2);
+        jobsById.put(published.getId(), published);
+
+        mockMvc.perform(get("/api/jobs/{id}", published.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.location").value("Kathmandu"))
+                .andExpect(jsonPath("$.remoteEligible").value(false))
+                .andExpect(jsonPath("$.minExperienceYears").value(2));
     }
 
     @Test

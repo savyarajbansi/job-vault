@@ -186,6 +186,8 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].jobId").value(strongMatchJob.getId().toString()))
                 .andExpect(jsonPath("$.items[0].missingSkills[0]").value("kubernetes"))
+                .andExpect(jsonPath("$.items[0].factors.experience").value(0.0))
+                .andExpect(jsonPath("$.items[0].factors.location").value(0.0))
                 .andExpect(jsonPath("$.page.total").value(2));
     }
 

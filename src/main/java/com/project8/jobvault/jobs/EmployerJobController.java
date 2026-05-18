@@ -52,6 +52,9 @@ public class EmployerJobController {
         job.setEmployer(employer);
         job.setTitle(request.title());
         job.setDescription(request.description());
+        job.setLocation(normalizeLocation(request.location()));
+        job.setRemoteEligible(request.remoteEligible());
+        job.setMinExperienceYears(request.minExperienceYears());
         job.setStatus(JobStatus.DRAFT);
         Job saved = jobRepository.save(job);
         return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(saved));
@@ -84,6 +87,9 @@ public class EmployerJobController {
         }
         job.setTitle(request.title());
         job.setDescription(request.description());
+        job.setLocation(normalizeLocation(request.location()));
+        job.setRemoteEligible(request.remoteEligible());
+        job.setMinExperienceYears(request.minExperienceYears());
         Job saved = jobRepository.save(job);
         syncRequiredSkills(saved);
         return ResponseEntity.ok(toDetail(saved));
@@ -181,10 +187,21 @@ public class EmployerJobController {
                 job.getId(),
                 job.getTitle(),
                 job.getDescription(),
+                job.getLocation(),
+                job.getRemoteEligible(),
+                job.getMinExperienceYears(),
                 job.getStatus(),
                 createdAt,
                 updatedAt,
                 job.getPublishedAt(),
                 job.getDisabledAt());
+    }
+
+    private String normalizeLocation(String location) {
+        if (location == null) {
+            return null;
+        }
+        String trimmed = location.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

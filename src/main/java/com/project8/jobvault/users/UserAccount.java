@@ -37,6 +37,15 @@ public class UserAccount {
     @Column(name = "preferred_sector", length = 100)
     private String preferredSector;
 
+    @Column(name = "preferred_location", length = 150)
+    private String preferredLocation;
+
+    @Column(name = "remote_ok")
+    private Boolean remoteOk;
+
+    @Column(name = "years_experience")
+    private Integer yearsExperience;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -93,6 +102,30 @@ public class UserAccount {
 
     public void setPreferredSector(String preferredSector) {
         this.preferredSector = preferredSector;
+    }
+
+    public String getPreferredLocation() {
+        return preferredLocation;
+    }
+
+    public void setPreferredLocation(String preferredLocation) {
+        this.preferredLocation = preferredLocation;
+    }
+
+    public Boolean getRemoteOk() {
+        return remoteOk;
+    }
+
+    public void setRemoteOk(Boolean remoteOk) {
+        this.remoteOk = remoteOk;
+    }
+
+    public Integer getYearsExperience() {
+        return yearsExperience;
+    }
+
+    public void setYearsExperience(Integer yearsExperience) {
+        this.yearsExperience = yearsExperience;
     }
 
     public boolean isEnabled() {
