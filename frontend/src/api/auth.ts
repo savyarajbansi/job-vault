@@ -46,6 +46,7 @@ export async function refresh(): Promise<AuthTokensResponse> {
   if (loggedOut || refreshFailed) {
     throw authRecoveryError();
   }
+  // Browser flow expects CSRF cookie + header; non-browser tests may omit cookies and mock the request path directly.
   return ensureRefresh();
 }
 
@@ -283,6 +284,7 @@ async function ensureRefresh(): Promise<AuthTokensResponse> {
 }
 
 async function requestRefreshTokens(): Promise<AuthTokensResponse> {
+  // In browsers we forward csrf_token cookie via X-CSRF-Token; test environments without document cookies send no header.
   const csrf = readCookie(CSRF_COOKIE);
   return request<AuthTokensResponse>("/api/auth/refresh", {
     method: "POST",

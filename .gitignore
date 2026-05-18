@@ -20,6 +20,7 @@ secrets/
 keys/
 .github/agents/
 *.agent.md
+.worktrees/
 
 # Documentation artifacts (local-only)
 /docs/plan/

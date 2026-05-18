@@ -154,6 +154,7 @@ public class MatchingFacade {
         double overall = clamp01(cosineScore * COSINE_WEIGHT + skillsOverlap * SKILL_WEIGHT);
         return new ScoredBreakdown(
                 overall,
+                // Experience/location remain 0.0 by design until PRD weighting/rules are finalized.
                 new MatchFactorBreakdown(cosineScore, skillsOverlap, 0.0, 0.0),
                 missingSkills);
     }
