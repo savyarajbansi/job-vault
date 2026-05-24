@@ -8,6 +8,7 @@ import com.project8.jobvault.resumes.ResumeMetadataRepository;
 import com.project8.jobvault.resumes.ResumeProcessingStatus;
 import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.users.UserAccount;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,109 +24,144 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MatchingFacade {
-    private static final double COSINE_WEIGHT = 0.8;
+    private static final double COSINE_WEIGHT = 0.7;
     private static final double SKILL_WEIGHT = 0.2;
+    private static final double EXPERIENCE_WEIGHT = 0.05;
+    private static final double LOCATION_WEIGHT = 0.05;
 
     private final ObjectProvider<JobRepository> jobRepositoryProvider;
     private final ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider;
+    private final ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider;
     private final TextTokenizer textTokenizer = new TextTokenizer(Set.of(
             "the", "a", "an", "and", "or", "for", "to", "of", "in", "on", "with"));
 
     public MatchingFacade(
             ObjectProvider<JobRepository> jobRepositoryProvider,
-            ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider) {
+            ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider,
+            ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider) {
         this.jobRepositoryProvider = jobRepositoryProvider;
         this.resumeMetadataRepositoryProvider = resumeMetadataRepositoryProvider;
+        this.matchAttemptRepositoryProvider = matchAttemptRepositoryProvider;
     }
 
-    public SeekerJobMatchResponse seekerMatches(UUID seekerId, int limit, int offset) {
-        ResumeMetadata resume = resumeMetadataRepository()
-                .findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
-                        seekerId,
-                        ResumeProcessingStatus.PARSED)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parsed resume not found"));
+    public SeekerJobMatchResponse seekerMatches(UserAccount seeker, int limit, int offset) {
+        ResumeMetadata resume = null;
+        long startNanos = System.nanoTime();
+        try {
+            resume = resumeMetadataRepository()
+                    .findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
+                            seeker.getId(),
+                            ResumeProcessingStatus.PARSED)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parsed resume not found"));
 
-        List<Job> activeJobs = jobRepository().findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE);
-        List<ScoredJob> scored = new ArrayList<>();
-        for (Job job : activeJobs) {
-            ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job);
-            scored.add(new ScoredJob(job, breakdown));
-        }
-        scored.sort((left, right) -> Double.compare(right.breakdown.overallScore(), left.breakdown.overallScore()));
-
-        int total = scored.size();
-        int safeOffset = Math.max(0, offset);
-        int safeLimit = Math.max(1, limit);
-        int end = Math.min(total, safeOffset + safeLimit);
-        List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = new ArrayList<>();
-        if (safeOffset < end) {
-            for (ScoredJob item : scored.subList(safeOffset, end)) {
-                items.add(new SeekerJobMatchResponse.SeekerJobMatchResponseItem(
-                        item.job.getId(),
-                        item.breakdown.overallScore(),
-                        item.breakdown.factors(),
-                        new SeekerJobMatchResponse.JobInfo(item.job.getTitle(), false),
-                        item.breakdown.missingSkills()));
+            List<Job> activeJobs = jobRepository().findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE);
+            List<ScoredJob> scored = new ArrayList<>();
+            for (Job job : activeJobs) {
+                ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job, seeker);
+                scored.add(new ScoredJob(job, breakdown));
             }
+            scored.sort((left, right) -> Double.compare(right.breakdown.overallScore(), left.breakdown.overallScore()));
+
+            int total = scored.size();
+            int safeOffset = Math.max(0, offset);
+            int safeLimit = Math.max(1, limit);
+            int end = Math.min(total, safeOffset + safeLimit);
+            List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = new ArrayList<>();
+            if (safeOffset < end) {
+                for (ScoredJob item : scored.subList(safeOffset, end)) {
+                    items.add(new SeekerJobMatchResponse.SeekerJobMatchResponseItem(
+                            item.job.getId(),
+                            item.breakdown.overallScore(),
+                            item.breakdown.factors(),
+                            new SeekerJobMatchResponse.JobInfo(
+                                    item.job.getTitle(),
+                                    Boolean.TRUE.equals(item.job.getRemoteEligible())),
+                            item.breakdown.missingSkills()));
+                }
+            }
+            SeekerJobMatchResponse response = new SeekerJobMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
+            recordMatchAttempt(null, resume, MatchAttemptStatus.SUCCESS, null, startNanos, items.size());
+            return response;
+        } catch (ResponseStatusException ex) {
+            recordMatchAttempt(null, resume, MatchAttemptStatus.FAILED, "ERR_MATCH_001", startNanos, null);
+            throw ex;
         }
-        return new SeekerJobMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
     }
 
     public EmployerCandidateMatchResponse employerCandidates(UUID employerId, UUID jobId, int limit, int offset) {
-        Job job = jobRepository().findById(jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
-        if (job.getEmployer() == null || !Objects.equals(job.getEmployer().getId(), employerId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
-        }
-        if (job.getStatus() != JobStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not ACTIVE");
-        }
-
-        List<ResumeMetadata> parsedResumes = resumeMetadataRepository()
-                .findAllByProcessingStatusOrderByParsedAtDesc(ResumeProcessingStatus.PARSED);
-        List<ScoredResume> scored = new ArrayList<>();
-        for (ResumeMetadata resume : parsedResumes) {
-            ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job);
-            scored.add(new ScoredResume(resume, breakdown));
-        }
-        scored.sort((left, right) -> Double.compare(right.breakdown.overallScore(), left.breakdown.overallScore()));
-
-        int total = scored.size();
-        int safeOffset = Math.max(0, offset);
-        int safeLimit = Math.max(1, limit);
-        int end = Math.min(total, safeOffset + safeLimit);
-        List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = new ArrayList<>();
-        if (safeOffset < end) {
-            for (ScoredResume item : scored.subList(safeOffset, end)) {
-                UserAccount seeker = item.resume.getSeeker();
-                UUID seekerId = seeker == null ? null : seeker.getId();
-                if (seekerId == null) {
-                    continue;
-                }
-                items.add(new EmployerCandidateMatchResponse.EmployerCandidateMatchItem(
-                        item.resume.getId(),
-                        seekerId,
-                        item.breakdown.overallScore(),
-                        item.breakdown.factors(),
-                        item.breakdown.missingSkills()));
+        Job job = null;
+        long startNanos = System.nanoTime();
+        try {
+            job = jobRepository().findById(jobId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+            if (job.getEmployer() == null || !Objects.equals(job.getEmployer().getId(), employerId)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");
             }
+            if (job.getStatus() != JobStatus.ACTIVE) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is not ACTIVE");
+            }
+
+            List<ResumeMetadata> parsedResumes = resumeMetadataRepository()
+                    .findAllByProcessingStatusOrderByParsedAtDesc(ResumeProcessingStatus.PARSED);
+            List<ScoredResume> scored = new ArrayList<>();
+            for (ResumeMetadata resume : parsedResumes) {
+                ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job, resume.getSeeker());
+                scored.add(new ScoredResume(resume, breakdown));
+            }
+            scored.sort((left, right) -> Double.compare(right.breakdown.overallScore(), left.breakdown.overallScore()));
+
+            int total = scored.size();
+            int safeOffset = Math.max(0, offset);
+            int safeLimit = Math.max(1, limit);
+            int end = Math.min(total, safeOffset + safeLimit);
+            List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = new ArrayList<>();
+            if (safeOffset < end) {
+                for (ScoredResume item : scored.subList(safeOffset, end)) {
+                    UserAccount seeker = item.resume.getSeeker();
+                    UUID seekerId = seeker == null ? null : seeker.getId();
+                    if (seekerId == null) {
+                        continue;
+                    }
+                    items.add(new EmployerCandidateMatchResponse.EmployerCandidateMatchItem(
+                            item.resume.getId(),
+                            seekerId,
+                            item.breakdown.overallScore(),
+                            item.breakdown.factors(),
+                            item.breakdown.missingSkills()));
+                }
+            }
+            EmployerCandidateMatchResponse response = new EmployerCandidateMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
+            recordMatchAttempt(job, null, MatchAttemptStatus.SUCCESS, null, startNanos, items.size());
+            return response;
+        } catch (ResponseStatusException ex) {
+            recordMatchAttempt(job, null, MatchAttemptStatus.FAILED, "ERR_MATCH_001", startNanos, null);
+            throw ex;
         }
-        return new EmployerCandidateMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
     }
 
-    public SkillGapResponse seekerSkillGap(UUID seekerId, UUID jobId) {
-        ResumeMetadata resume = resumeMetadataRepository()
-                .findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
-                        seekerId,
-                        ResumeProcessingStatus.PARSED)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parsed resume not found"));
-        Job job = jobRepository().findByIdAndStatus(jobId, JobStatus.ACTIVE)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
-        ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job);
-        return new SkillGapResponse(jobId, breakdown.missingSkills());
+    public SkillGapResponse seekerSkillGap(UserAccount seeker, UUID jobId) {
+        ResumeMetadata resume = null;
+        Job job = null;
+        long startNanos = System.nanoTime();
+        try {
+            resume = resumeMetadataRepository()
+                    .findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
+                            seeker.getId(),
+                            ResumeProcessingStatus.PARSED)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parsed resume not found"));
+            job = jobRepository().findByIdAndStatus(jobId, JobStatus.ACTIVE)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+            ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job, seeker);
+            SkillGapResponse response = new SkillGapResponse(jobId, breakdown.missingSkills());
+            recordMatchAttempt(job, resume, MatchAttemptStatus.SUCCESS, null, startNanos, breakdown.missingSkills().size());
+            return response;
+        } catch (ResponseStatusException ex) {
+            recordMatchAttempt(job, resume, MatchAttemptStatus.FAILED, "ERR_MATCH_002", startNanos, null);
+            throw ex;
+        }
     }
 
-    private ScoredBreakdown scoreResumeAgainstJob(ResumeMetadata resume, Job job) {
+    private ScoredBreakdown scoreResumeAgainstJob(ResumeMetadata resume, Job job, UserAccount seeker) {
         List<String> resumeTokens = textTokenizer.tokenize(orEmpty(resume.getParsedText()));
         List<String> jobTokens = textTokenizer.tokenize(orEmpty(job.getDescription()));
         List<List<String>> corpus = List.of(resumeTokens, jobTokens);
@@ -151,11 +187,16 @@ public class MatchingFacade {
                 .sorted()
                 .toList();
 
-        double overall = clamp01(cosineScore * COSINE_WEIGHT + skillsOverlap * SKILL_WEIGHT);
+        double experienceScore = experienceScore(seeker, job);
+        double locationScore = locationScore(seeker, job);
+        double overall = clamp01(
+                cosineScore * COSINE_WEIGHT
+                        + skillsOverlap * SKILL_WEIGHT
+                        + experienceScore * EXPERIENCE_WEIGHT
+                        + locationScore * LOCATION_WEIGHT);
         return new ScoredBreakdown(
                 overall,
-                // Experience/location remain 0.0 by design until PRD weighting/rules are finalized.
-                new MatchFactorBreakdown(cosineScore, skillsOverlap, 0.0, 0.0),
+                new MatchFactorBreakdown(cosineScore, skillsOverlap, experienceScore, locationScore),
                 missingSkills);
     }
 
@@ -190,6 +231,52 @@ public class MatchingFacade {
         return value;
     }
 
+    private double experienceScore(UserAccount seeker, Job job) {
+        Integer minRequired = job == null ? null : job.getMinExperienceYears();
+        if (minRequired == null || minRequired <= 0) {
+            return 1.0;
+        }
+        Integer seekerYears = seeker == null ? null : seeker.getYearsExperience();
+        if (seekerYears == null || seekerYears <= 0) {
+            return 0.0;
+        }
+        if (seekerYears >= minRequired) {
+            return 1.0;
+        }
+        return clamp01((double) seekerYears / minRequired);
+    }
+
+    private double locationScore(UserAccount seeker, Job job) {
+        boolean remoteEligible = job != null && Boolean.TRUE.equals(job.getRemoteEligible());
+        boolean remoteOk = seeker != null && Boolean.TRUE.equals(seeker.getRemoteOk());
+        String seekerLocation = normalizeLocation(seeker == null ? null : seeker.getPreferredLocation());
+        String jobLocation = normalizeLocation(job == null ? null : job.getLocation());
+        boolean matches = locationMatches(seekerLocation, jobLocation);
+
+        if (remoteEligible && remoteOk) {
+            return 1.0;
+        }
+        return matches ? 1.0 : 0.0;
+    }
+
+    private boolean locationMatches(String seekerLocation, String jobLocation) {
+        if (seekerLocation == null || jobLocation == null) {
+            return false;
+        }
+        if (seekerLocation.equals(jobLocation)) {
+            return true;
+        }
+        return seekerLocation.contains(jobLocation) || jobLocation.contains(seekerLocation);
+    }
+
+    private String normalizeLocation(String location) {
+        if (location == null) {
+            return null;
+        }
+        String trimmed = location.trim().toLowerCase(Locale.ROOT);
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private record ScoredBreakdown(
             double overallScore,
             MatchFactorBreakdown factors,
@@ -204,6 +291,33 @@ public class MatchingFacade {
     private record ScoredResume(
             ResumeMetadata resume,
             ScoredBreakdown breakdown) {
+    }
+
+    private void recordMatchAttempt(
+            Job job,
+            ResumeMetadata resume,
+            MatchAttemptStatus status,
+            String errorCode,
+            long startNanos,
+            Integer resultCount) {
+        MatchAttemptRepository repository = matchAttemptRepositoryProvider.getIfAvailable();
+        if (repository == null) {
+            return;
+        }
+        MatchAttempt attempt = new MatchAttempt();
+        attempt.setJob(job);
+        attempt.setResume(resume);
+        attempt.setStatus(status);
+        attempt.setErrorCode(errorCode);
+        attempt.setResultCount(resultCount);
+        attempt.setDurationMs(toDurationMs(startNanos));
+        repository.save(attempt);
+    }
+
+    private int toDurationMs(long startNanos) {
+        long elapsedNanos = System.nanoTime() - startNanos;
+        long millis = Duration.ofNanos(Math.max(0L, elapsedNanos)).toMillis();
+        return millis > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) millis;
     }
 
     private JobRepository jobRepository() {

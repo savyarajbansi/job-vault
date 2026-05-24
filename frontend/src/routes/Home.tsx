@@ -16,6 +16,9 @@ export default function Home() {
           <Link className="cta secondary" to="/seeker">
             Open seeker workspace
           </Link>
+          <Link className="cta secondary" to="/admin/metrics">
+            Open admin metrics
+          </Link>
           <a className="cta secondary" href="/api" rel="noreferrer">
             Backend health
           </a>

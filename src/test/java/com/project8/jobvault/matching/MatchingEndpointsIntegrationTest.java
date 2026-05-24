@@ -106,6 +106,9 @@ class MatchingEndpointsIntegrationTest {
         seekerUser = buildUser("seeker@example.com", seekerRole);
         employerUser = buildUser("employer@example.com", employerRole);
         otherEmployerUser = buildUser("other-employer@example.com", employerRole);
+        seekerUser.setYearsExperience(5);
+        seekerUser.setPreferredLocation("Austin, TX");
+        seekerUser.setRemoteOk(true);
 
         when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID id = invocation.getArgument(0);
@@ -135,12 +138,18 @@ class MatchingEndpointsIntegrationTest {
                 "Backend Engineer",
                 "Java Spring SQL microservices",
                 Set.of(skill("java"), skill("spring"), skill("kubernetes")));
+        strongMatchJob.setLocation("Austin, TX");
+        strongMatchJob.setRemoteEligible(false);
+        strongMatchJob.setMinExperienceYears(3);
         weakMatchJob = buildJob(
                 employerUser,
                 JobStatus.ACTIVE,
                 "Frontend Engineer",
                 "React TypeScript UI performance",
                 Set.of(skill("react"), skill("typescript")));
+        weakMatchJob.setLocation("New York, NY");
+        weakMatchJob.setRemoteEligible(false);
+        weakMatchJob.setMinExperienceYears(6);
 
         when(resumeMetadataRepository.findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
                 seekerUser.getId(),
@@ -186,8 +195,8 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].jobId").value(strongMatchJob.getId().toString()))
                 .andExpect(jsonPath("$.items[0].missingSkills[0]").value("kubernetes"))
-                .andExpect(jsonPath("$.items[0].factors.experience").value(0.0))
-                .andExpect(jsonPath("$.items[0].factors.location").value(0.0))
+                .andExpect(jsonPath("$.items[0].factors.experience").value(1.0))
+                .andExpect(jsonPath("$.items[0].factors.location").value(1.0))
                 .andExpect(jsonPath("$.page.total").value(2));
     }
 

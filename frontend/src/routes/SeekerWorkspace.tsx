@@ -2,7 +2,9 @@ import { FormEvent, useMemo, useState } from "react";
 
 import {
   getSeekerMatches,
+  getSeekerResumeHistory,
   getSeekerSkillGaps,
+  ResumeHistoryResponse,
   SeekerJobMatchResponse,
   uploadSeekerResume
 } from "../api/seeker";
@@ -47,6 +49,11 @@ export default function SeekerWorkspace() {
   const [latestUpload, setLatestUpload] = useState<{ resumeId: string; status: string } | null>(
     null
   );
+  const [historyLimit, setHistoryLimit] = useState(5);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ResumeHistoryResponse | null>(null);
 
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
@@ -81,6 +88,22 @@ export default function SeekerWorkspace() {
       setUploadBanner({ tone: "error", message: errorMessage(error) });
     } finally {
       setUploadBusy(false);
+    }
+  };
+
+  const handleLoadHistory = async () => {
+    setHistoryBusy(true);
+    setHistoryError(null);
+    try {
+      const response = await getSeekerResumeHistory({
+        limit: historyLimit,
+        offset: historyOffset
+      });
+      setHistory(response);
+    } catch (error) {
+      setHistoryError(errorMessage(error));
+    } finally {
+      setHistoryBusy(false);
     }
   };
 
@@ -167,6 +190,75 @@ export default function SeekerWorkspace() {
             >
               {uploadBanner.message}
             </div>
+          )}
+        </article>
+
+        <article className="card">
+          <h2>Resume history</h2>
+          <div className="seeker-controls">
+            <div>
+              <label htmlFor="history-limit">Limit</label>
+              <input
+                id="history-limit"
+                type="number"
+                min={1}
+                value={historyLimit}
+                onChange={(event) => setHistoryLimit(Math.max(1, Number(event.target.value) || 1))}
+              />
+            </div>
+            <div>
+              <label htmlFor="history-offset">Offset</label>
+              <input
+                id="history-offset"
+                type="number"
+                min={0}
+                value={historyOffset}
+                onChange={(event) => setHistoryOffset(Math.max(0, Number(event.target.value) || 0))}
+              />
+            </div>
+          </div>
+          <div className="actions" style={{ marginTop: 16 }}>
+            <button className="secondary" onClick={handleLoadHistory} disabled={historyBusy}>
+              {historyBusy ? "Loading..." : "Load history"}
+            </button>
+          </div>
+          {historyError && (
+            <div className="status status-error" role="alert">
+              {historyError}
+            </div>
+          )}
+          {history && (
+            <>
+              <p className="mono">
+                Page: limit {history.page.limit}, offset {history.page.offset}, total{" "}
+                {history.page.total}
+              </p>
+              {history.items.length === 0 ? (
+                <p className="mono">No resume uploads found yet.</p>
+              ) : (
+                <ul className="seeker-list">
+                  {history.items.map((item) => (
+                    <li key={item.resumeId}>
+                      <strong>{item.originalFilename}</strong> ({item.status})
+                      <br />
+                      <span className="mono">Uploaded: {item.createdAt}</span>
+                      {item.parsedAt && (
+                        <>
+                          <br />
+                          <span className="mono">Parsed: {item.parsedAt}</span>
+                        </>
+                      )}
+                      {item.failureCode && (
+                        <>
+                          <br />
+                          <span className="mono">Failure: {item.failureCode}</span>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </article>
 

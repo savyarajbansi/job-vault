@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import AppLayout from "./layout/AppLayout";
+import AdminMetricsPage from "./routes/AdminMetrics";
 import AuthConsole from "./routes/AuthConsole";
 import Home from "./routes/Home";
 import NotFound from "./routes/NotFound";
@@ -13,6 +14,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="auth" element={<AuthConsole />} />
         <Route path="seeker" element={<SeekerWorkspace />} />
+        <Route path="admin/metrics" element={<AdminMetricsPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

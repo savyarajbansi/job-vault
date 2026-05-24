@@ -35,7 +35,7 @@ public class SeekerMatchController {
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         UserAccount seeker = requireUser(principal);
-        return ResponseEntity.ok(requireFacade().seekerMatches(seeker.getId(), limit, offset));
+        return ResponseEntity.ok(requireFacade().seekerMatches(seeker, limit, offset));
     }
 
     @GetMapping("/jobs/{jobId}/skill-gaps")
@@ -43,7 +43,7 @@ public class SeekerMatchController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount seeker = requireUser(principal);
-        return ResponseEntity.ok(requireFacade().seekerSkillGap(seeker.getId(), jobId));
+        return ResponseEntity.ok(requireFacade().seekerSkillGap(seeker, jobId));
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
