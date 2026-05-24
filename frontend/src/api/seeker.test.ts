@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authorizedRequest } from "./auth";
 import {
   getSeekerMatches,
+  getSeekerResumeHistory,
   getSeekerSkillGaps,
   uploadSeekerResume
 } from "./seeker";
@@ -49,6 +50,21 @@ describe("seeker api client", () => {
       { method: "GET" }
     );
     expect(result.page.limit).toBe(5);
+  });
+
+  it("loads seeker resume history with limit and offset query params", async () => {
+    vi.mocked(authorizedRequest).mockResolvedValue({
+      items: [],
+      page: { limit: 3, offset: 6, total: 0 }
+    });
+
+    const result = await getSeekerResumeHistory({ limit: 3, offset: 6 });
+
+    expect(authorizedRequest).toHaveBeenCalledWith(
+      "/api/seeker/resumes?limit=3&offset=6",
+      { method: "GET" }
+    );
+    expect(result.page.offset).toBe(6);
   });
 
   it("loads skill gaps for a selected job", async () => {

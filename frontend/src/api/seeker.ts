@@ -5,6 +5,20 @@ export type ResumeUploadResult = {
   status: string;
 };
 
+export type ResumeHistoryItem = {
+  resumeId: string;
+  originalFilename: string;
+  status: string;
+  failureCode: string | null;
+  createdAt: string;
+  parsedAt: string | null;
+};
+
+export type ResumeHistoryResponse = {
+  items: ResumeHistoryItem[];
+  page: MatchPage;
+};
+
 export type MatchFactors = {
   cosine: number;
   skillsOverlap: number;
@@ -39,6 +53,11 @@ export type SkillGapResponse = {
   missingSkills: string[];
 };
 
+export type SeekerResumeHistoryQuery = {
+  limit: number;
+  offset: number;
+};
+
 export type SeekerMatchesQuery = {
   limit: number;
   offset: number;
@@ -52,6 +71,19 @@ export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult
     method: "POST",
     body: formData
   });
+}
+
+export async function getSeekerResumeHistory(
+  params: SeekerResumeHistoryQuery
+): Promise<ResumeHistoryResponse> {
+  const query = new URLSearchParams({
+    limit: String(params.limit),
+    offset: String(params.offset)
+  });
+  return authorizedRequest<ResumeHistoryResponse>(
+    `/api/seeker/resumes?${query.toString()}`,
+    { method: "GET" }
+  );
 }
 
 export async function getSeekerMatches(
