@@ -1,6 +1,8 @@
 # Canonical skill and optional synonyms separated by pipes.
+java|java 8|java 11|java 17|java 24|java 25
 java|java 8|java 11|java 17
 spring|spring framework
+spring boot|springboot|spring-boot
 spring boot|springboot
 sql|postgres|postgresql|mysql
 javascript|js
@@ -9,3 +11,61 @@ react|react.js
 python
 aws|amazon web services
 docker|kubernetes|k8s
+hibernate|jpa
+rest|restful|rest api|restful api
+microservices|microservice architecture
+git|github|gitlab
+linux|unix
+html|html5
+css|css3
+node.js|nodejs
+express|express.js
+next.js|nextjs
+angular|angularjs
+vue.js|vue|vuejs
+redux
+tailwind css|tailwind
+bootstrap
+c#|c sharp
+.net|dotnet|asp.net|asp.net core
+go|golang
+rust
+c++
+c
+php|laravel
+ruby|ruby on rails|rails
+scala
+mongodb|mongo
+redis
+elasticsearch|elastic search
+rabbitmq
+kafka|apache kafka
+graphql
+grpc
+oauth2|oauth 2.0
+openid connect|oidc
+jwt|json web token
+terraform
+ansible
+jenkins
+github actions
+gitlab ci
+ci/cd|continuous integration|continuous delivery
+azure|microsoft azure
+gcp|google cloud platform|google cloud
+firebase
+react native
+flutter
+android
+ios|swift|objective-c
+pytest|junit|unit testing
+cypress
+playwright
+selenium
+agile|scrum|kanban
+data structures
+algorithms
+machine learning|ml
+nlp|natural language processing
+data analysis|pandas|numpy
+tableau|power bi
