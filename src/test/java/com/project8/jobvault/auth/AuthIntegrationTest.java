@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -274,6 +275,25 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void loginRevokesExpiredNonRevokedTokensBeforeApplyingSessionLimit() throws Exception {
+        Instant now = clock.instant();
+        RefreshToken expiredA = createRefreshToken(seekerUser, now.minus(Duration.ofDays(2)), false);
+        RefreshToken expiredB = createRefreshToken(seekerUser, now.minus(Duration.ofHours(1)), false);
+        RefreshToken active = createRefreshToken(seekerUser, now.plus(Duration.ofDays(5)), false);
+        tokenStore.put(expiredA.getId(), expiredA);
+        tokenStore.put(expiredB.getId(), expiredB);
+        tokenStore.put(active.getId(), active);
+
+        performLogin();
+
+        assertTrue(expiredA.isRevoked());
+        assertTrue(expiredB.isRevoked());
+        assertNotNull(expiredA.getRevokedAt());
+        assertNotNull(expiredB.getRevokedAt());
+        assertFalse(active.isRevoked());
+    }
+
+    @Test
     void meRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/me"))
                 .andExpect(status().isUnauthorized())
@@ -477,6 +497,19 @@ class AuthIntegrationTest {
         account.getRoles().add(role);
         account.setEnabled(true);
         return account;
+    }
+
+    private RefreshToken createRefreshToken(UserAccount user, Instant expiresAt, boolean revoked) {
+        RefreshToken token = new RefreshToken();
+        token.setId(UUID.randomUUID());
+        token.setUser(user);
+        token.setTokenHash("hash-" + token.getId());
+        token.setExpiresAt(expiresAt);
+        token.setRevoked(revoked);
+        if (revoked) {
+            token.setRevokedAt(clock.instant());
+        }
+        return token;
     }
 
     @NonNull

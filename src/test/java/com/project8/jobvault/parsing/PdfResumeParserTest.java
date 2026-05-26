@@ -2,6 +2,9 @@ package com.project8.jobvault.parsing;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Writer;
+import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -51,9 +54,27 @@ class PdfResumeParserTest {
         assertEquals(ParseErrorCodes.EMPTY_TEXT, ex.getCode());
     }
 
+    @Test
+    void boundedStringWriterDoesNotSplitSurrogatePairsOrExceedByteBudget() throws Exception {
+        Writer writer = createBoundedWriter(5);
+
+        writer.write("A\uD83D\uDE00B");
+
+        String output = writer.toString();
+        assertEquals("A\uD83D\uDE00", output);
+        assertEquals(5, output.getBytes(StandardCharsets.UTF_8).length);
+    }
+
     private PdfResumeParser buildParser() {
         SkillCatalog catalog = new SkillCatalog("classpath:skills/skill-dictionary.txt");
         return new PdfResumeParser(MAX_PAGES, MAX_TEXT_BYTES, TIMEOUT, catalog);
+    }
+
+    private Writer createBoundedWriter(int maxBytes) throws Exception {
+        Class<?> writerClass = Class.forName("com.project8.jobvault.parsing.PdfResumeParser$BoundedStringWriter");
+        Constructor<?> ctor = writerClass.getDeclaredConstructor(int.class);
+        ctor.setAccessible(true);
+        return (Writer) ctor.newInstance(maxBytes);
     }
 
     private byte[] createPdfWithText(String text) throws IOException {
