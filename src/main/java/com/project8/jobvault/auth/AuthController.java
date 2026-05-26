@@ -3,6 +3,7 @@ package com.project8.jobvault.auth;
 import com.project8.jobvault.users.Role;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.security.CorsProperties;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,9 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -50,7 +48,7 @@ public class AuthController {
             JwtProperties jwtProperties,
             AuthCookieProperties cookieProperties,
             AuthCookieService cookieService,
-            Environment environment) {
+            CorsProperties corsProperties) {
         this.userAccountRepository = userAccountRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
@@ -59,11 +57,7 @@ public class AuthController {
         this.jwtProperties = jwtProperties;
         this.cookieProperties = cookieProperties;
         this.cookieService = cookieService;
-        Binder binder = Binder.get(environment);
-        List<String> configuredOrigins = binder
-                .bind("spring.mvc.cors.allowed-origins", Bindable.listOf(String.class))
-                .orElse(List.of());
-        this.allowedOrigins = normalizeAllowedOrigins(configuredOrigins);
+        this.allowedOrigins = normalizeAllowedOrigins(corsProperties.getAllowedOrigins());
     }
 
     @PostMapping("/auth/login")

@@ -3,10 +3,7 @@ package com.project8.jobvault.security;
 import com.project8.jobvault.auth.AuthCookieProperties;
 import com.project8.jobvault.auth.JwtProperties;
 import java.time.Clock;
-import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,14 +15,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.core.env.Environment;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({ JwtProperties.class, AuthCookieProperties.class })
+@EnableConfigurationProperties({ JwtProperties.class, AuthCookieProperties.class, CorsProperties.class })
 public class SecurityConfig {
 
         @Bean
@@ -61,20 +57,13 @@ public class SecurityConfig {
         }
 
         @Bean
-        public CorsConfigurationSource corsConfigurationSource(Environment environment) {
-                Binder binder = Binder.get(environment);
+        public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
                 CorsConfiguration cors = new CorsConfiguration();
-                cors.setAllowedOrigins(binder
-                                .bind("spring.mvc.cors.allowed-origins", Bindable.listOf(String.class))
-                                .orElse(List.of()));
-                cors.setAllowedMethods(binder
-                                .bind("spring.mvc.cors.allowed-methods", Bindable.listOf(String.class))
-                                .orElse(List.of()));
-                cors.setAllowedHeaders(binder
-                                .bind("spring.mvc.cors.allowed-headers", Bindable.listOf(String.class))
-                                .orElse(List.of()));
-                cors.setAllowCredentials(binder.bind("spring.mvc.cors.allow-credentials", Boolean.class).orElse(false));
-                cors.setMaxAge(binder.bind("spring.mvc.cors.max-age", Long.class).orElse(1800L));
+                cors.setAllowedOrigins(corsProperties.getAllowedOrigins());
+                cors.setAllowedMethods(corsProperties.getAllowedMethods());
+                cors.setAllowedHeaders(corsProperties.getAllowedHeaders());
+                cors.setAllowCredentials(corsProperties.isAllowCredentials());
+                cors.setMaxAge(corsProperties.getMaxAge());
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/api/**", cors);
                 return source;
