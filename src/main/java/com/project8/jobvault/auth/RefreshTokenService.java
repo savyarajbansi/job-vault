@@ -111,7 +111,11 @@ public class RefreshTokenService {
         for (RefreshToken token : activeTokens) {
             if (token.getExpiresAt().isAfter(now)) {
                 activeCount++;
+                continue;
             }
+            token.setRevoked(true);
+            token.setRevokedAt(now);
+            refreshTokenRepository.save(token);
         }
         if (activeCount < maxSessions) {
             return;
