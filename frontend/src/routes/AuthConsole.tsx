@@ -22,6 +22,7 @@ function toUserMessage(error: unknown): string {
 }
 
 export default function AuthConsole() {
+  const TOKEN_PREVIEW_LENGTH = 36;
   const [credentials, setCredentials] = useState(initialCreds);
   const [auth, setAuth] = useState<AuthTokensResponse | null>(null);
   const [profile, setProfile] = useState<AuthUser | null>(null);
@@ -113,6 +114,13 @@ export default function AuthConsole() {
     }
   };
 
+  const token = auth?.accessToken ?? getAccessToken();
+  const tokenPreview = token
+    ? token.length > TOKEN_PREVIEW_LENGTH
+      ? token.slice(0, TOKEN_PREVIEW_LENGTH) + "..."
+      : token
+    : "n/a";
+
   return (
     <div className="page">
       <section className="hero">
@@ -162,11 +170,7 @@ export default function AuthConsole() {
         <div className="card">
           <h2>Session snapshot</h2>
           <p className="mono">Access token (localStorage)</p>
-          <p className="mono">
-            {(auth?.accessToken ?? getAccessToken())
-              ? (auth?.accessToken ?? getAccessToken())!.slice(0, 36) + "..."
-              : "n/a"}
-          </p>
+          <p className="mono">{tokenPreview}</p>
           <p className="mono">Expires at: {auth?.accessTokenExpiresAt ?? "n/a"}</p>
           <p className="mono">
             Refresh expiry: {auth?.refreshTokenExpiresAt ?? "n/a"}

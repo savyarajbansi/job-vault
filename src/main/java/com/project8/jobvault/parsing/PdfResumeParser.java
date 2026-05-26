@@ -14,6 +14,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jakarta.annotation.PreDestroy;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -28,6 +29,7 @@ public class PdfResumeParser implements ResumeParser {
     private final int maxTextBytes;
     private final Duration timeout;
     private final SkillCatalog skillCatalog;
+    private final ExecutorService parserExecutor;
 
     @Autowired
     public PdfResumeParser(
@@ -46,6 +48,7 @@ public class PdfResumeParser implements ResumeParser {
             throw new IllegalArgumentException("timeout must be positive");
         }
         this.skillCatalog = Objects.requireNonNull(skillCatalog, "skillCatalog");
+        this.parserExecutor = Executors.newSingleThreadExecutor(new ParserThreadFactory());
     }
 
     @Override
@@ -71,10 +74,9 @@ public class PdfResumeParser implements ResumeParser {
     }
 
     private String extractTextWithTimeout(byte[] pdfBytes) {
-        ExecutorService executor = Executors.newSingleThreadExecutor(new ParserThreadFactory());
         Future<String> future = null;
         try {
-            future = executor.submit(() -> extractText(pdfBytes));
+            future = parserExecutor.submit(() -> extractText(pdfBytes));
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException ex) {
             if (future != null) {
@@ -108,9 +110,12 @@ public class PdfResumeParser implements ResumeParser {
                     ParseErrorCodes.MESSAGE_PARSE_FAILED,
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     Map.of("reason", "interrupted"));
-        } finally {
-            executor.shutdownNow();
         }
+    }
+
+    @PreDestroy
+    void shutdownParserExecutor() {
+        parserExecutor.shutdownNow();
     }
 
     private String extractText(byte[] pdfBytes) throws IOException {
@@ -229,13 +234,14 @@ public class PdfResumeParser implements ResumeParser {
 
         private int allowedChars(String chunk, int remainingBytes) {
             int usedBytes = 0;
-            for (int i = 0; i < chunk.length(); i++) {
-                char c = chunk.charAt(i);
-                int charBytes = String.valueOf(c).getBytes(StandardCharsets.UTF_8).length;
+            for (int i = 0; i < chunk.length();) {
+                int charCount = Character.charCount(chunk.codePointAt(i));
+                int charBytes = chunk.substring(i, i + charCount).getBytes(StandardCharsets.UTF_8).length;
                 if (usedBytes + charBytes > remainingBytes) {
                     return i;
                 }
                 usedBytes += charBytes;
+                i += charCount;
             }
             return chunk.length();
         }
