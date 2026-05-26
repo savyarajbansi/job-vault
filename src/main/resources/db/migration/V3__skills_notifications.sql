@@ -47,7 +47,3 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_recipient ON notifications (recipient_id);
 CREATE INDEX idx_notifications_recipient_unread ON notifications (recipient_id, is_read);
-
-UPDATE jobs
-SET status = 'ACTIVE'
-WHERE status = 'ACTIVE';
