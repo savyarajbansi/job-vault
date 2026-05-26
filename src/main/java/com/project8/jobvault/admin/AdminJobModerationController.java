@@ -47,13 +47,13 @@ public class AdminJobModerationController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount admin = requireUser(principal);
-        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
         Instant now = clock.instant();
-        int rows = jobRepository.approveForAdmin(resolvedJobId, admin, now, now);
+        int rows = jobRepository.approveForAdmin(jobId, admin, now, now);
         if (rows == 0) {
-            throw resolveMissingOrConflict(resolvedJobId);
+            throw resolveMissingOrConflict(jobId);
         }
-        Job updated = jobRepository.findById(resolvedJobId)
+        // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
+        Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(updated));
     }
@@ -82,15 +82,15 @@ public class AdminJobModerationController {
             AdminJobModerationRequest request,
             JobModerationAction action) {
         UserAccount admin = requireUser(principal);
-        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
         Instant now = clock.instant();
         Objects.requireNonNull(request, "request");
         String reason = Objects.requireNonNull(request.moderationReason(), "moderationReason").trim();
-        int rows = jobRepository.moderateActiveToDisabled(resolvedJobId, action, reason, admin, now, now);
+        int rows = jobRepository.moderateActiveToDisabled(jobId, action, reason, admin, now, now);
         if (rows == 0) {
-            throw resolveMissingOrConflict(resolvedJobId);
+            throw resolveMissingOrConflict(jobId);
         }
-        Job updated = jobRepository.findById(resolvedJobId)
+        // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
+        Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(toDetail(updated));
     }

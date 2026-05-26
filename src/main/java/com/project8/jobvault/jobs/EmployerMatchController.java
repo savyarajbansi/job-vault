@@ -43,11 +43,7 @@ public class EmployerMatchController {
             @PathVariable UUID jobId,
             @Valid @RequestBody CandidateMatchRequest request) {
         UserAccount employer = requireUser(principal);
-        if (jobId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "jobId is required");
-        }
-        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
-        Job job = jobRepository.findById(resolvedJobId)
+        Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         if (job.getEmployer() == null || !employer.getId().equals(job.getEmployer().getId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found");

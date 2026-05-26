@@ -89,8 +89,7 @@ public class SeekerApplicationController {
             application.setSeeker(seeker);
             application.setStatus(ApplicationStatus.SUBMITTED);
             application.setSubmittedAt(clock.instant());
-            JobApplication toSave = Objects.requireNonNull(application, "application");
-            saved = saveOrConflict(toSave);
+            saved = saveOrConflict(application);
         }
 
         UserAccount employer = job.getEmployer();
@@ -113,8 +112,7 @@ public class SeekerApplicationController {
 
     private JobApplication saveOrConflict(JobApplication application) {
         try {
-            JobApplication toSave = Objects.requireNonNull(application, "application");
-            return jobApplicationRepository.save(toSave);
+            return jobApplicationRepository.save(application);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Application already exists");
         }
@@ -124,8 +122,7 @@ public class SeekerApplicationController {
             UUID applicationId,
             UUID seekerId,
             String conflictReason) {
-        UUID resolvedApplicationId = Objects.requireNonNull(applicationId, "applicationId");
-        Optional<JobApplication> existing = jobApplicationRepository.findById(resolvedApplicationId);
+        Optional<JobApplication> existing = jobApplicationRepository.findById(applicationId);
         if (existing.isEmpty()) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
         }
