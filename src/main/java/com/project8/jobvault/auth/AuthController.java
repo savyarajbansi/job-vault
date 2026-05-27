@@ -1,7 +1,9 @@
 package com.project8.jobvault.auth;
 
 import com.project8.jobvault.users.Role;
+import com.project8.jobvault.users.RoleRepository;
 import com.project8.jobvault.users.UserAccount;
+import com.project8.jobvault.users.UserAccountFactory;
 import com.project8.jobvault.users.UserAccountRepository;
 import com.project8.jobvault.security.CorsProperties;
 import jakarta.servlet.http.Cookie;
@@ -11,6 +13,7 @@ import jakarta.validation.Valid;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,7 +32,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class AuthController {
+    private static final String ROLE_JOB_SEEKER = "JOB_SEEKER";
+    private static final String ROLE_EMPLOYER = "EMPLOYER";
+
     private final UserAccountRepository userAccountRepository;
+    private final RoleRepository roleRepository;
+    private final UserAccountFactory userAccountFactory;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenService refreshTokenService;
@@ -41,6 +49,8 @@ public class AuthController {
 
     public AuthController(
             UserAccountRepository userAccountRepository,
+            RoleRepository roleRepository,
+            UserAccountFactory userAccountFactory,
             PasswordEncoder passwordEncoder,
             JwtTokenService jwtTokenService,
             RefreshTokenService refreshTokenService,
@@ -50,6 +60,8 @@ public class AuthController {
             AuthCookieService cookieService,
             CorsProperties corsProperties) {
         this.userAccountRepository = userAccountRepository;
+        this.roleRepository = roleRepository;
+        this.userAccountFactory = userAccountFactory;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
         this.refreshTokenService = refreshTokenService;
@@ -70,6 +82,27 @@ public class AuthController {
             throw new BadCredentialsException("Invalid credentials");
         }
         return ResponseEntity.ok(issueTokens(user, response));
+    }
+
+    @PostMapping("/auth/register")
+    public ResponseEntity<AuthTokensResponse> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletResponse response) {
+        String email = normalizeEmail(request.email());
+        if (userAccountRepository.findByEmail(email).isPresent()) {
+            throw registrationInvalid(HttpStatus.CONFLICT, "email_exists");
+        }
+        String requestedRole = normalizeRole(request.role());
+        Role role = resolveRegistrationRole(requestedRole);
+
+        UserAccount user = userAccountFactory.newRegisteredUser(
+                email,
+                passwordEncoder.encode(request.password()),
+                normalizeDisplayName(request.displayName()),
+                role);
+
+        UserAccount saved = userAccountRepository.save(user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(issueTokens(saved, response));
     }
 
     @PostMapping("/auth/refresh")
@@ -180,6 +213,44 @@ public class AuthController {
                 AuthErrorCodes.MESSAGE_REFRESH_INVALID,
                 HttpStatus.UNAUTHORIZED,
                 Map.of("reason", reason));
+    }
+
+    private AuthErrorException registrationInvalid(HttpStatus status, String reason) {
+        return new AuthErrorException(
+                AuthErrorCodes.REGISTRATION_INVALID,
+                AuthErrorCodes.MESSAGE_REGISTRATION_INVALID,
+                status,
+                Map.of("reason", reason));
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeDisplayName(String displayName) {
+        if (displayName == null) {
+            return null;
+        }
+        String normalized = displayName.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return ROLE_JOB_SEEKER;
+        }
+        return role.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private Role resolveRegistrationRole(String requestedRole) {
+        if (!ROLE_JOB_SEEKER.equals(requestedRole) && !ROLE_EMPLOYER.equals(requestedRole)) {
+            throw registrationInvalid(HttpStatus.BAD_REQUEST, "invalid_role");
+        }
+        return roleRepository.findByName(requestedRole)
+                .orElseThrow(() -> registrationInvalid(HttpStatus.SERVICE_UNAVAILABLE, "role_not_configured"));
     }
 
     private void validateCsrfDoubleSubmit(HttpServletRequest request) {

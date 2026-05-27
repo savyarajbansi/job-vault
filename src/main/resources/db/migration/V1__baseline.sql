@@ -1,2 +1,3 @@
 -- Baseline migration
--- No-op placeholder to initialize Flyway metadata.
+-- Intentionally no-op. Fresh databases run V2+ to create schema objects.
+-- For baselining pre-existing databases, set baseline-version to the schema's current version.
