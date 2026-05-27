@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -24,24 +25,26 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MatchingFacade {
-    private static final double COSINE_WEIGHT = 0.7;
-    private static final double SKILL_WEIGHT = 0.2;
-    private static final double EXPERIENCE_WEIGHT = 0.05;
+    private static final double COSINE_WEIGHT = 0.55;
+    private static final double SKILL_WEIGHT = 0.3;
+    private static final double EXPERIENCE_WEIGHT = 0.1;
     private static final double LOCATION_WEIGHT = 0.05;
 
     private final ObjectProvider<JobRepository> jobRepositoryProvider;
     private final ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider;
     private final ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider;
-    private final TextTokenizer textTokenizer = new TextTokenizer(Set.of(
-            "the", "a", "an", "and", "or", "for", "to", "of", "in", "on", "with"));
+    private final CorpusIdfService corpusIdfService;
+    private final TextTokenizer textTokenizer = new TextTokenizer(MatchingStopwords.DEFAULT);
 
     public MatchingFacade(
             ObjectProvider<JobRepository> jobRepositoryProvider,
             ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider,
-            ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider) {
+            ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider,
+            CorpusIdfService corpusIdfService) {
         this.jobRepositoryProvider = jobRepositoryProvider;
         this.resumeMetadataRepositoryProvider = resumeMetadataRepositoryProvider;
         this.matchAttemptRepositoryProvider = matchAttemptRepositoryProvider;
+        this.corpusIdfService = corpusIdfService;
     }
 
     public SeekerJobMatchResponse seekerMatches(UserAccount seeker, int limit, int offset) {
@@ -164,8 +167,16 @@ public class MatchingFacade {
     private ScoredBreakdown scoreResumeAgainstJob(ResumeMetadata resume, Job job, UserAccount seeker) {
         List<String> resumeTokens = textTokenizer.tokenize(orEmpty(resume.getParsedText()));
         List<String> jobTokens = textTokenizer.tokenize(orEmpty(job.getDescription()));
-        List<List<String>> corpus = List.of(resumeTokens, jobTokens);
-        TfIdfVectorizer vectorizer = new TfIdfVectorizer(InverseDocumentFrequency.compute(corpus));
+        Map<String, Double> idf = corpusIdfService.getIdf();
+        if (idf.isEmpty()) {
+            corpusIdfService.rebuildFromRepository();
+            idf = corpusIdfService.getIdf();
+        }
+        if (idf.isEmpty()) {
+            List<List<String>> fallbackCorpus = List.of(resumeTokens, jobTokens);
+            idf = InverseDocumentFrequency.compute(fallbackCorpus);
+        }
+        TfIdfVectorizer vectorizer = new TfIdfVectorizer(idf);
         double cosineScore = CosineSimilarity.compute(vectorizer.vectorize(resumeTokens), vectorizer.vectorize(jobTokens));
 
         Set<Skill> requiredSkills = job.getRequiredSkills() == null ? Set.of() : job.getRequiredSkills();

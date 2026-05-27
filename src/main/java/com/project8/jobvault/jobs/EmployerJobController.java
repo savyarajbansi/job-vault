@@ -1,6 +1,7 @@
 package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.matching.CorpusIdfService;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
@@ -29,16 +30,19 @@ public class EmployerJobController {
     private final JobRepository jobRepository;
     private final UserAccountRepository userAccountRepository;
     private final ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider;
+    private final CorpusIdfService corpusIdfService;
     private final Clock clock;
 
     public EmployerJobController(
             JobRepository jobRepository,
             UserAccountRepository userAccountRepository,
             ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider,
+            CorpusIdfService corpusIdfService,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
         this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
+        this.corpusIdfService = corpusIdfService;
         this.clock = clock;
     }
 
@@ -57,6 +61,7 @@ public class EmployerJobController {
         job.setMinExperienceYears(request.minExperienceYears());
         job.setStatus(JobStatus.DRAFT);
         Job saved = jobRepository.save(job);
+        refreshIdfCorpus();
         return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(saved));
     }
 
@@ -92,6 +97,7 @@ public class EmployerJobController {
         job.setMinExperienceYears(request.minExperienceYears());
         Job saved = jobRepository.save(job);
         syncRequiredSkills(saved);
+        refreshIdfCorpus();
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -107,6 +113,7 @@ public class EmployerJobController {
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
+        refreshIdfCorpus();
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -122,6 +129,7 @@ public class EmployerJobController {
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
+        refreshIdfCorpus();
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -136,6 +144,7 @@ public class EmployerJobController {
         }
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        refreshIdfCorpus();
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -178,6 +187,10 @@ public class EmployerJobController {
 
     private void syncRequiredSkills(Job job) {
         jobRequiredSkillSyncServiceProvider.ifAvailable(service -> service.syncRequiredSkills(job));
+    }
+
+    private void refreshIdfCorpus() {
+        corpusIdfService.rebuildFromRepository();
     }
 
     private JobDetailResponse toDetail(Job job) {

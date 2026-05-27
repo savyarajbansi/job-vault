@@ -5,6 +5,7 @@ import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobDetailResponse;
 import com.project8.jobvault.jobs.JobModerationAction;
 import com.project8.jobvault.jobs.JobRepository;
+import com.project8.jobvault.matching.CorpusIdfService;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
@@ -30,14 +31,17 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdminJobModerationController {
     private final JobRepository jobRepository;
     private final UserAccountRepository userAccountRepository;
+    private final CorpusIdfService corpusIdfService;
     private final Clock clock;
 
     public AdminJobModerationController(
             JobRepository jobRepository,
             UserAccountRepository userAccountRepository,
+            CorpusIdfService corpusIdfService,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
+        this.corpusIdfService = corpusIdfService;
         this.clock = clock;
     }
 
@@ -55,6 +59,7 @@ public class AdminJobModerationController {
         // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
         Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        corpusIdfService.rebuildFromRepository();
         return ResponseEntity.ok(toDetail(updated));
     }
 
@@ -92,6 +97,7 @@ public class AdminJobModerationController {
         // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
         Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        corpusIdfService.rebuildFromRepository();
         return ResponseEntity.ok(toDetail(updated));
     }
 
