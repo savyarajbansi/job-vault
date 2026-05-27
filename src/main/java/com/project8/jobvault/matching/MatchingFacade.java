@@ -25,10 +25,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MatchingFacade {
-    private static final double COSINE_WEIGHT = 0.55;
+    private static final double COSINE_WEIGHT = 0.4;
     private static final double SKILL_WEIGHT = 0.3;
-    private static final double EXPERIENCE_WEIGHT = 0.1;
-    private static final double LOCATION_WEIGHT = 0.05;
+    private static final double EXPERIENCE_WEIGHT = 0.2;
+    private static final double LOCATION_WEIGHT = 0.1;
 
     private final ObjectProvider<JobRepository> jobRepositoryProvider;
     private final ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider;
