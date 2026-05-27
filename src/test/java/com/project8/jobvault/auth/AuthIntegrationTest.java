@@ -124,6 +124,7 @@ class AuthIntegrationTest {
     private final ConcurrentMap<String, UUID> tokenHashIndex = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UserAccount> userByEmail = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, UserAccount> userById = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Role> roleByName = new ConcurrentHashMap<>();
 
     private UserAccount seekerUser;
     private UserAccount employerUser;
@@ -135,6 +136,11 @@ class AuthIntegrationTest {
         tokenHashIndex.clear();
         userByEmail.clear();
         userById.clear();
+        roleByName.clear();
+
+        roleByName.put("JOB_SEEKER", buildRole("JOB_SEEKER"));
+        roleByName.put("EMPLOYER", buildRole("EMPLOYER"));
+        roleByName.put("ADMIN", buildRole("ADMIN"));
 
         seekerUser = buildUser("user@example.com", "JOB_SEEKER");
         employerUser = buildUser("employer@example.com", "EMPLOYER");
@@ -148,9 +154,21 @@ class AuthIntegrationTest {
             String email = invocation.getArgument(0);
             return Optional.ofNullable(userByEmail.get(email));
         });
+        when(userAccountRepository.save(nonNullArgument())).thenAnswer(invocation -> {
+            UserAccount user = invocation.getArgument(0);
+            if (user.getId() == null) {
+                user.setId(UUID.randomUUID());
+            }
+            indexUser(user);
+            return user;
+        });
         when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
             return Optional.ofNullable(userById.get(userId));
+        });
+        when(roleRepository.findByName(anyString())).thenAnswer(invocation -> {
+            String name = invocation.getArgument(0);
+            return Optional.ofNullable(roleByName.get(name));
         });
         when(refreshTokenRepository.save(nonNullArgument())).thenAnswer(invocation -> {
             RefreshToken token = invocation.getArgument(0);
@@ -201,6 +219,66 @@ class AuthIntegrationTest {
         String csrfToken = extractCookieValue(result, CSRF_COOKIE);
         assertNotNull(csrfToken);
         assertTrue(hasCookieAttribute(result, CSRF_COOKIE, "SameSite=Lax"));
+    }
+
+    @Test
+    void registerCreatesUserAndReturnsTokens() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "email":"new-user@example.com",
+                          "password":"password123",
+                          "displayName":"New User",
+                          "role":"JOB_SEEKER"
+                        }
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.user.id").isNotEmpty())
+                .andExpect(jsonPath("$.user.roles[0]").value("JOB_SEEKER"))
+                .andReturn();
+
+        UserAccount saved = userByEmail.get("new-user@example.com");
+        assertNotNull(saved);
+        assertEquals("New User", saved.getDisplayName());
+        assertTrue(passwordEncoder.matches("password123", saved.getPasswordHash()));
+        assertNotEquals("password123", saved.getPasswordHash());
+        assertNotNull(extractCookieValue(result, REFRESH_COOKIE));
+    }
+
+    @Test
+    void registerRejectsDuplicateEmail() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "email":"user@example.com",
+                          "password":"password123",
+                          "displayName":"Duplicate",
+                          "role":"JOB_SEEKER"
+                        }
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_004"))
+                .andExpect(jsonPath("$.details.reason").value("email_exists"));
+    }
+
+    @Test
+    void registerRejectsUnknownRole() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "email":"another@example.com",
+                          "password":"password123",
+                          "displayName":"Another",
+                          "role":"ADMIN"
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_004"))
+                .andExpect(jsonPath("$.details.reason").value("invalid_role"));
     }
 
     @Test
@@ -487,8 +565,11 @@ class AuthIntegrationTest {
     }
 
     private UserAccount buildUser(String email, String roleName) {
-        Role role = new TestRole();
-        role.setName(roleName);
+        Role role = roleByName.get(roleName);
+        if (role == null) {
+            role = buildRole(roleName);
+            roleByName.put(roleName, role);
+        }
 
         UserAccount account = new TestUserAccount();
         account.setId(UUID.randomUUID());
@@ -497,6 +578,13 @@ class AuthIntegrationTest {
         account.getRoles().add(role);
         account.setEnabled(true);
         return account;
+    }
+
+    private Role buildRole(String roleName) {
+        Role role = new TestRole();
+        role.setId(UUID.randomUUID());
+        role.setName(roleName);
+        return role;
     }
 
     private RefreshToken createRefreshToken(UserAccount user, Instant expiresAt, boolean revoked) {
