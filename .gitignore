@@ -21,6 +21,7 @@ keys/
 .github/agents/
 *.agent.md
 .worktrees/
+.superpowers/
 
 # Documentation artifacts (local-only)
 /docs/plan/
