@@ -17,7 +17,6 @@
 - Modify: `frontend/src/layout/AppLayout.tsx`
 - Create: `frontend/src/layout/session.ts`
 - Create: `frontend/src/layout/session.test.ts`
-- Create: `frontend/src/layout/AppLayout.test.tsx`
 - Create: `frontend/src/routes/AccessDenied.tsx`
 
 - [ ] **Step 1: Write the failing test**
@@ -32,7 +31,7 @@ expect(formatRoleLabel("EMPLOYER")).toBe("Employer");
 expect(formatRoleLabel("ADMIN")).toBe("Admin");
 ```
 
-Also add `frontend/src/layout/AppLayout.test.tsx` with a render test that proves the auth-checking state is shown before protected navigation when the session has not been verified.
+Also add a render test for the layout shell that proves the auth-checking state is shown before protected navigation when the session has not been verified.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -83,7 +82,6 @@ git commit -m "feat: gate the shell on verified sessions"
 - Modify: `frontend/src/api/seeker.ts`
 - Create: `frontend/src/api/seeker.test.ts`
 - Modify: `frontend/src/routes/SeekerWorkspace.tsx`
-- Create: `frontend/src/routes/SeekerWorkspace.test.tsx`
 - Create: `frontend/src/routes/seeker/readiness.ts`
 - Create: `frontend/src/routes/seeker/readiness.test.ts`
 - Create: `frontend/src/routes/seeker/SeekerWorkspacePanels.tsx`
@@ -276,17 +274,16 @@ git commit -m "feat: surface admin moderation controls"
 **Files:**
 - Modify: `frontend/src/index.css`
 - Modify: `frontend/src/layout/AppLayout.tsx`
-- Modify: `frontend/src/layout/AppLayout.test.tsx`
 - Modify: `frontend/src/routes/Home.tsx`
 - Modify: `frontend/src/routes/NotFound.tsx`
 
 - [ ] **Step 1: Write the failing test**
 
-Extend `frontend/src/layout/AppLayout.test.tsx` with a small smoke test that proves the shell can render the neutral loading state, the signed-in nav, and the unauthorized state without overlapping content.
+Add a small smoke test for the layout copy or helper state that proves the shell can render the neutral loading state, the signed-in nav, and the unauthorized state without overlapping content.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `npm test -- frontend/src/layout/AppLayout.test.tsx`
+Run: `npm test`
 Expected: the new smoke test fails until the shared shell copy and CSS are updated.
 
 - [ ] **Step 3: Write minimal implementation**

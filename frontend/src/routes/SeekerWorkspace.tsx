@@ -116,7 +116,7 @@ export default function SeekerWorkspace() {
       setSelectedJobId((current) =>
         response.items.some((item) => item.jobId === current)
           ? current
-          : (response.items[0]?.jobId ?? "")
+          : response.items[0]?.jobId ?? ""
       );
       setSkillGapsState({ state: "idle" });
     } catch (error) {
@@ -150,180 +150,137 @@ export default function SeekerWorkspace() {
   };
 
   return (
-    <div className="page">
-      <section className="hero">
-        <h1>Seeker Workspace</h1>
-        <p>
-          Upload your latest resume, load ranked job matches, and inspect job-specific
-          skill gaps.
-        </p>
-      </section>
+    <main>
+      <h1>Seeker</h1>
+      <p>Resume upload, history, matches, and skill-gap data remain wired to the API.</p>
 
-      <section className="grid seeker-grid">
-        <article className="card">
-          <h2>Resume upload</h2>
-          <form onSubmit={handleUpload}>
+      <section>
+        <h2>Resume upload</h2>
+        <form onSubmit={handleUpload}>
+          <p>
             <label htmlFor="resume-file">Resume PDF</label>
+            <br />
             <input
               id="resume-file"
               type="file"
               accept=".pdf,application/pdf"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-            <div className="actions" style={{ marginTop: 16 }}>
-              <button type="submit" disabled={uploadBusy}>
-                {uploadBusy ? "Uploading..." : "Upload resume"}
-              </button>
-            </div>
-          </form>
-          <p className="mono">Status: {uploadStatus}</p>
-          {latestUpload && (
-            <p className="mono">
-              Latest upload: {latestUpload.resumeId} ({latestUpload.status})
-            </p>
-          )}
-          {uploadBanner && (
-            <div
-              className={`status ${uploadBanner.tone === "success" ? "status-success" : "status-error"}`}
-              role={uploadBanner.tone === "error" ? "alert" : "status"}
-              aria-live="polite"
-            >
-              {uploadBanner.message}
-            </div>
-          )}
-        </article>
-
-        <article className="card">
-          <h2>Resume history</h2>
-          <div className="seeker-controls">
-            <div>
-              <label htmlFor="history-limit">Limit</label>
-              <input
-                id="history-limit"
-                type="number"
-                min={1}
-                value={historyLimit}
-                onChange={(event) => setHistoryLimit(Math.max(1, Number(event.target.value) || 1))}
-              />
-            </div>
-            <div>
-              <label htmlFor="history-offset">Offset</label>
-              <input
-                id="history-offset"
-                type="number"
-                min={0}
-                value={historyOffset}
-                onChange={(event) => setHistoryOffset(Math.max(0, Number(event.target.value) || 0))}
-              />
-            </div>
-          </div>
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button className="secondary" onClick={handleLoadHistory} disabled={historyBusy}>
-              {historyBusy ? "Loading..." : "Load history"}
+          </p>
+          <p>
+            <button type="submit" disabled={uploadBusy}>
+              {uploadBusy ? "Uploading..." : "Upload resume"}
             </button>
-          </div>
-          {historyError && (
-            <div className="status status-error" role="alert">
-              {historyError}
-            </div>
-          )}
-          {history && (
-            <>
-              <p className="mono">
-                Page: limit {history.page.limit}, offset {history.page.offset}, total{" "}
-                {history.page.total}
-              </p>
-              {history.items.length === 0 ? (
-                <p className="mono">No resume uploads found yet.</p>
-              ) : (
-                <ul className="seeker-list">
-                  {history.items.map((item) => (
-                    <li key={item.resumeId}>
-                      <strong>{item.originalFilename}</strong> ({item.status})
-                      <br />
-                      <span className="mono">Uploaded: {item.createdAt}</span>
-                      {item.parsedAt && (
-                        <>
-                          <br />
-                          <span className="mono">Parsed: {item.parsedAt}</span>
-                        </>
-                      )}
-                      {item.failureCode && (
-                        <>
-                          <br />
-                          <span className="mono">Failure: {item.failureCode}</span>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </article>
+          </p>
+        </form>
+        <pre>Status: {uploadStatus}</pre>
+        {latestUpload && <pre>Latest upload: {latestUpload.resumeId} ({latestUpload.status})</pre>}
+        {uploadBanner && (
+          <p>
+            {uploadBanner.tone.toUpperCase()}: {uploadBanner.message}
+          </p>
+        )}
+      </section>
 
-        <article className="card">
-          <h2>Ranked matches</h2>
-          <div className="seeker-controls">
-            <div>
-              <label htmlFor="limit">Limit</label>
-              <input
-                id="limit"
-                type="number"
-                min={1}
-                value={limit}
-                onChange={(event) => setLimit(Math.max(1, Number(event.target.value) || 1))}
-              />
-            </div>
-            <div>
-              <label htmlFor="offset">Offset</label>
-              <input
-                id="offset"
-                type="number"
-                min={0}
-                value={offset}
-                onChange={(event) => setOffset(Math.max(0, Number(event.target.value) || 0))}
-              />
-            </div>
-          </div>
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button className="secondary" onClick={handleLoadMatches} disabled={matchesBusy}>
-              {matchesBusy ? "Loading..." : "Fetch matches"}
-            </button>
-          </div>
-          {matchesError && (
-            <div className="status status-error" role="alert">
-              {matchesError}
-            </div>
-          )}
-          {matches && (
-            <>
-              <p className="mono">
-                Page: limit {matches.page.limit}, offset {matches.page.offset}, total{" "}
-                {matches.page.total}
-              </p>
-              <ul className="seeker-list">
-                {sortedMatchJobs.map((item) => (
-                  <li key={item.jobId}>
-                    <strong>{item.job.title}</strong> ({item.jobId}) score{" "}
-                    {item.score.toFixed(4)}
-                    <br />
-                    <span className="mono">
-                      Factors: cosine {item.factors.cosine.toFixed(4)}, skills{" "}
-                      {item.factors.skillsOverlap.toFixed(4)}, experience{" "}
-                      {item.factors.experience.toFixed(4)}, location{" "}
-                      {item.factors.location.toFixed(4)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </article>
+      <section>
+        <h2>Resume history</h2>
+        <p>
+          <label htmlFor="history-limit">Limit</label>
+          <br />
+          <input
+            id="history-limit"
+            type="number"
+            min={1}
+            value={historyLimit}
+            onChange={(event) => setHistoryLimit(Math.max(1, Number(event.target.value) || 1))}
+          />
+        </p>
+        <p>
+          <label htmlFor="history-offset">Offset</label>
+          <br />
+          <input
+            id="history-offset"
+            type="number"
+            min={0}
+            value={historyOffset}
+            onChange={(event) => setHistoryOffset(Math.max(0, Number(event.target.value) || 0))}
+          />
+        </p>
+        <p>
+          <button type="button" onClick={() => void handleLoadHistory()} disabled={historyBusy}>
+            {historyBusy ? "Loading..." : "Load history"}
+          </button>
+        </p>
+        {historyError && <p>{historyError}</p>}
+        {history && (
+          <>
+            <pre>
+              Page: limit {history.page.limit}, offset {history.page.offset}, total{" "}
+              {history.page.total}
+            </pre>
+            <ul>
+              {history.items.map((item) => (
+                <li key={item.resumeId}>
+                  {item.originalFilename} ({item.status})
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
 
-        <article className="card">
-          <h2>Skill gaps</h2>
+      <section>
+        <h2>Ranked matches</h2>
+        <p>
+          <label htmlFor="limit">Limit</label>
+          <br />
+          <input
+            id="limit"
+            type="number"
+            min={1}
+            value={limit}
+            onChange={(event) => setLimit(Math.max(1, Number(event.target.value) || 1))}
+          />
+        </p>
+        <p>
+          <label htmlFor="offset">Offset</label>
+          <br />
+          <input
+            id="offset"
+            type="number"
+            min={0}
+            value={offset}
+            onChange={(event) => setOffset(Math.max(0, Number(event.target.value) || 0))}
+          />
+        </p>
+        <p>
+          <button type="button" onClick={() => void handleLoadMatches()} disabled={matchesBusy}>
+            {matchesBusy ? "Loading..." : "Fetch matches"}
+          </button>
+        </p>
+        {matchesError && <p>{matchesError}</p>}
+        {matches && (
+          <>
+            <pre>
+              Page: limit {matches.page.limit}, offset {matches.page.offset}, total{" "}
+              {matches.page.total}
+            </pre>
+            <ul>
+              {sortedMatchJobs.map((item) => (
+                <li key={item.jobId}>
+                  {item.job.title} ({item.jobId}) score {item.score.toFixed(4)}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2>Skill gaps</h2>
+        <p>
           <label htmlFor="job-select">Selected job</label>
+          <br />
           <select
             id="job-select"
             value={selectedJobId}
@@ -340,44 +297,34 @@ export default function SeekerWorkspace() {
               </option>
             ))}
           </select>
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button
-              className="ghost"
-              onClick={handleLoadSkillGaps}
-              disabled={!selectedJobId || skillGapsState.state === "loading"}
-            >
-              {skillGapsState.state === "loading" ? "Loading..." : "Check skill gaps"}
-            </button>
-          </div>
+        </p>
+        <p>
+          <button
+            type="button"
+            onClick={() => void handleLoadSkillGaps()}
+            disabled={!selectedJobId || skillGapsState.state === "loading"}
+          >
+            {skillGapsState.state === "loading" ? "Loading..." : "Check skill gaps"}
+          </button>
+        </p>
 
-          {skillGapsState.state === "idle" && (
-            <p className="mono">Select a job and request skill gaps.</p>
-          )}
-          {skillGapsState.state === "loading" && (
-            <p className="mono">Loading skill gaps for {selectedJobId}...</p>
-          )}
-          {skillGapsState.state === "error" && (
-            <div className="status status-error" role="alert">
-              {skillGapsState.message}
-            </div>
-          )}
-          {skillGapsState.state === "perfect_match" && (
-            <div className="status status-success">
-              No missing skills. You are a strong match for this role.
-            </div>
-          )}
-          {skillGapsState.state === "has_gaps" && (
-            <>
-              <p className="mono">Job ID: {skillGapsState.jobId}</p>
-              <ul className="seeker-list">
-                {skillGapsState.missingSkills.map((skill) => (
-                  <li key={skill}>{skill}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </article>
+        {skillGapsState.state === "idle" && <p>Select a job and request skill gaps.</p>}
+        {skillGapsState.state === "loading" && <p>Loading skill gaps for {selectedJobId}...</p>}
+        {skillGapsState.state === "error" && <p>{skillGapsState.message}</p>}
+        {skillGapsState.state === "perfect_match" && (
+          <p>No missing skills. You are a strong match for this role.</p>
+        )}
+        {skillGapsState.state === "has_gaps" && (
+          <>
+            <pre>Job ID: {skillGapsState.jobId}</pre>
+            <ul>
+              {skillGapsState.missingSkills.map((skill) => (
+                <li key={skill}>{skill}</li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
-    </div>
+    </main>
   );
 }
