@@ -1,35 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+
+/* ─── Design Tokens ───────────────────────────────────────────── */
 :root {
-  color-scheme: light;
-  font-family: Arial, Helvetica, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #111827;
-  background: #ffffff;
+  --bg:          #F6F3EE;
+  --bg-card:     #FDFCFA;
+  --bg-subtle:   #EDE9E1;
+  --ink:         #1A1916;
+  --ink-2:       #3D3B36;
+  --ink-muted:   #7A776E;
+  --ink-faint:   #B0ADA6;
+  --accent:      #2D6E6E;
+  --accent-h:    #235858;
+  --accent-faint:#EAF2F2;
+  --warn:        #C0622A;
+  --warn-faint:  #FBF0E9;
+  --success:     #2A7048;
+  --success-faint:#EAF4EE;
+  --border:      #DDD9D1;
+  --border-focus:#2D6E6E;
+  --radius-sm:   6px;
+  --radius:      12px;
+  --radius-lg:   20px;
+  --shadow-sm:   0 1px 3px rgba(26,25,22,0.07);
+  --shadow:      0 4px 16px rgba(26,25,22,0.09);
+  --shadow-lg:   0 12px 40px rgba(26,25,22,0.12);
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ─── Reset ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  margin: 0;
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
   min-height: 100vh;
-  background: #ffffff;
 }
 
-a {
-  color: inherit;
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ─── Typography ──────────────────────────────────────────────── */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  color: var(--ink);
 }
 
-button,
-input,
-select {
-  font: inherit;
+h1 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 700; }
+h2 { font-size: clamp(1.25rem, 2.5vw, 1.625rem); font-weight: 600; }
+h3 { font-size: 1.125rem; font-weight: 600; }
+h4 { font-size: 1rem; font-weight: 600; font-family: var(--font-body); }
+
+p { color: var(--ink-2); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ─── Form elements ───────────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
+button { font-family: var(--font-body); cursor: pointer; }
+
+/* ─── Utility classes ─────────────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+}
