@@ -216,9 +216,15 @@ public class AuthController {
     }
 
     private AuthErrorException registrationInvalid(HttpStatus status, String reason) {
+        String message = switch (reason) {
+            case "email_exists" -> AuthErrorCodes.MESSAGE_REGISTRATION_EMAIL_EXISTS;
+            case "invalid_role" -> AuthErrorCodes.MESSAGE_REGISTRATION_INVALID_ROLE;
+            case "role_not_configured" -> AuthErrorCodes.MESSAGE_REGISTRATION_ROLE_MISSING;
+            default -> AuthErrorCodes.MESSAGE_REGISTRATION_INVALID;
+        };
         return new AuthErrorException(
                 AuthErrorCodes.REGISTRATION_INVALID,
-                AuthErrorCodes.MESSAGE_REGISTRATION_INVALID,
+                message,
                 status,
                 Map.of("reason", reason));
     }

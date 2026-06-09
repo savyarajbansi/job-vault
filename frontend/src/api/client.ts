@@ -12,6 +12,30 @@ type ApiResponse = {
   payload: unknown;
 };
 
+type ApiErrorBody = {
+  code?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+};
+
+export class ApiResponseError extends Error {
+  readonly response: Response;
+  readonly payload: unknown;
+  readonly code?: string;
+  readonly details?: Record<string, unknown>;
+
+  constructor(response: Response, payload: unknown) {
+    const body = payload as ApiErrorBody | null;
+    const message = body?.message ?? response.statusText;
+    super(body?.code ? `${body.code}: ${message}` : message);
+    this.name = "ApiResponseError";
+    this.response = response;
+    this.payload = payload;
+    this.code = body?.code;
+    this.details = body?.details;
+  }
+}
+
 const defaultEnv =
   (import.meta as unknown as { env?: EnvConfig }).env ?? ({} as EnvConfig);
 
@@ -75,8 +99,5 @@ function parsePayload(response: Response, text: string): unknown {
 }
 
 export function throwResponseError(response: Response, payload: unknown): never {
-  const body = payload as { code?: string; message?: string } | null;
-  const message = body?.message ?? response.statusText;
-  const code = body?.code ? `${body.code}: ${message}` : message;
-  throw new Error(code);
+  throw new ApiResponseError(response, payload);
 }

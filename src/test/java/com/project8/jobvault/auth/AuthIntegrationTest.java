@@ -282,6 +282,27 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void registerRejectsMissingConfiguredRole() throws Exception {
+        when(roleRepository.findByName("JOB_SEEKER")).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "email":"missing-role@example.com",
+                          "password":"password123",
+                          "displayName":"Missing Role",
+                          "role":"JOB_SEEKER"
+                        }
+                        """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_004"))
+                .andExpect(jsonPath("$.message").value(
+                        "Registration is temporarily unavailable because required roles are not configured."))
+                .andExpect(jsonPath("$.details.reason").value("role_not_configured"));
+    }
+
+    @Test
     void loginRejectsInvalidPayloadWithConsistentError() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON_VALUE)

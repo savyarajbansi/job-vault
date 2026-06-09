@@ -32,6 +32,10 @@ class CoreSchemaMigrationTest {
             assertColumnExists(connection, "resumes", "inferred_skills");
             assertColumnExists(connection, "resumes", "storage_type");
             assertColumnExists(connection, "resumes", "storage_key");
+
+            assertRoleExists(connection, "ADMIN");
+            assertRoleExists(connection, "EMPLOYER");
+            assertRoleExists(connection, "JOB_SEEKER");
         }
     }
 
@@ -58,6 +62,11 @@ class CoreSchemaMigrationTest {
                 """;
         String[] args = new String[] { tableName, columnName };
         assertEquals(1, countMatches(connection, sql, args));
+    }
+
+    private void assertRoleExists(Connection connection, String roleName) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM roles WHERE name = ?";
+        assertEquals(1, countMatches(connection, sql, roleName));
     }
 
     private int countMatches(Connection connection, String sql, String... args) throws SQLException {

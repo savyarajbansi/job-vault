@@ -133,6 +133,35 @@ describe("auth persistence and refresh recovery", () => {
     expect(globalThis.localStorage.getItem(ACCESS_TOKEN_KEY)).toBe("token-login");
   });
 
+  it("preserves structured API error payloads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(409, {
+        code: "ERR_AUTH_004",
+        message: "An account with this email already exists.",
+        details: { reason: "email_exists" }
+      })
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      value: fetchMock,
+      writable: true,
+      configurable: true
+    });
+
+    const client = await import("./client");
+
+    await expect(
+      client.request("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}"
+      })
+    ).rejects.toMatchObject({
+      name: "ApiResponseError",
+      message: "ERR_AUTH_004: An account with this email already exists.",
+      code: "ERR_AUTH_004"
+    });
+  });
+
   it("runs a single refresh for concurrent GET requests and retries each once", async () => {
     globalThis.localStorage.setItem(ACCESS_TOKEN_KEY, "token-old");
 

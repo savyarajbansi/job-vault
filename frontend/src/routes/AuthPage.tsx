@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, getAccessToken } from "../api/auth";
-import { request } from "../api/client";
+import { ApiResponseError, request } from "../api/client";
 import { AuthTokensResponse } from "../api/auth";
 import { Button, Input, Alert, Card, Divider } from "../components/ui";
 
@@ -35,6 +35,9 @@ function parseFieldErrors(payload: unknown): FieldErrors {
   }
   if (reason === "email_exists") return { email: "An account with this email already exists." };
   if (reason === "invalid_role") return { general: "Invalid role selected." };
+  if (reason === "role_not_configured") {
+    return { general: "Registration is temporarily unavailable because required roles are not configured." };
+  }
   const msg = (p["message"] as string) ?? "Something went wrong.";
   return { general: msg };
 }
@@ -114,12 +117,12 @@ export default function AuthPage() {
       await login(regEmail, regPassword);
       navigate("/seeker", { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("email_exists") || msg.toLowerCase().includes("exist")) {
-        setRegErrors({ email: "An account with this email already exists." });
-      } else if (msg.includes("ERR_AUTH_002")) {
-        setRegErrors({ general: "Please check the form and try again." });
+      const payload = err instanceof ApiResponseError ? err.payload : undefined;
+      const parsed = parseFieldErrors(payload);
+      if (Object.keys(parsed).length > 0) {
+        setRegErrors(parsed);
       } else {
+        const msg = err instanceof Error ? err.message : "";
         setRegErrors({ general: msg || "Registration failed. Please try again." });
       }
     } finally {
