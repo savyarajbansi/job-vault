@@ -1,14 +1,15 @@
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getAccessToken } from "../api/auth";
+import { useAuth } from "../api/authContext";
 import { Button } from "../components/ui";
 
 export default function Home() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (getAccessToken()) navigate("/seeker", { replace: true });
-  }, [navigate]);
+    if (isAuthenticated) navigate("/seeker", { replace: true });
+  }, [isAuthenticated, navigate]);
 
   return (
     <>

@@ -63,6 +63,21 @@ export type SeekerMatchesQuery = {
   offset: number;
 };
 
+export type SeekerProfile = {
+  userId: string;
+  preferredSector: string | null;
+  preferredLocation: string | null;
+  remoteOk: boolean | null;
+  yearsExperience: number | null;
+};
+
+export type SeekerProfileUpdate = {
+  preferredSector?: string | null;
+  preferredLocation?: string | null;
+  remoteOk?: boolean | null;
+  yearsExperience?: number | null;
+};
+
 export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult> {
   const formData = new FormData();
   formData.set("file", file);
@@ -102,5 +117,17 @@ export async function getSeekerMatches(
 export async function getSeekerSkillGaps(jobId: string): Promise<SkillGapResponse> {
   return authorizedRequest<SkillGapResponse>(`/api/seeker/jobs/${jobId}/skill-gaps`, {
     method: "GET"
+  });
+}
+
+export async function getSeekerProfile(): Promise<SeekerProfile> {
+  return authorizedRequest<SeekerProfile>("/api/seeker/profile", { method: "GET" });
+}
+
+export async function updateSeekerProfile(data: SeekerProfileUpdate): Promise<SeekerProfile> {
+  return authorizedRequest<SeekerProfile>("/api/seeker/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
   });
 }

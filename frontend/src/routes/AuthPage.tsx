@@ -1,9 +1,10 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { login, getAccessToken } from "../api/auth";
+import { getAccessToken } from "../api/auth";
+import { useAuth } from "../api/authContext";
 import { ApiResponseError, request } from "../api/client";
 import { AuthTokensResponse } from "../api/auth";
-import { Button, Input, Alert, Card, Divider } from "../components/ui";
+import { Button, Input, Alert, Card } from "../components/ui";
 
 type Tab = "signin" | "register";
 type Role = "JOB_SEEKER" | "EMPLOYER";
@@ -42,7 +43,7 @@ function parseFieldErrors(payload: unknown): FieldErrors {
   return { general: msg };
 }
 
-async function register(
+async function registerUser(
   email: string,
   password: string,
   displayName: string,
@@ -58,9 +59,9 @@ async function register(
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const { login, setUser } = useAuth();
   const [tab, setTab] = useState<Tab>("signin");
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (getAccessToken()) navigate("/seeker", { replace: true });
   }, [navigate]);
@@ -87,10 +88,11 @@ export default function AuthPage() {
     setSiLoading(true);
     try {
       await login(siEmail, siPassword);
+      // setUser with displayName derived from email for now; dashboard will fetch real profile
+      setUser({ email: siEmail, displayName: null });
       navigate("/seeker", { replace: true });
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
-      // Try to extract structured error from message
       if (raw.includes("ERR_AUTH_002") || raw.toLowerCase().includes("invalid")) {
         setSiErrors({ general: "Incorrect email or password. Please try again." });
       } else {
@@ -111,10 +113,10 @@ export default function AuthPage() {
     }
     setRegLoading(true);
     try {
-      // We need to call the request directly to get the full error body
-      const result = await register(regEmail, regPassword, regDisplay, regRole);
-      // Store token — reuse login logic
+      await registerUser(regEmail, regPassword, regDisplay, regRole);
+      // Now login so auth state is set properly
       await login(regEmail, regPassword);
+      setUser({ email: regEmail, displayName: regDisplay || null });
       navigate("/seeker", { replace: true });
     } catch (err) {
       const payload = err instanceof ApiResponseError ? err.payload : undefined;
@@ -177,7 +179,6 @@ export default function AuthPage() {
         .role-card:hover:not(.selected) { border-color: var(--ink-muted); }
       `}</style>
 
-      {/* Full-page layout */}
       <div
         style={{
           minHeight: "calc(100vh - 56px)",
@@ -188,7 +189,6 @@ export default function AuthPage() {
         }}
       >
         <div style={{ width: "100%", maxWidth: 440 }}>
-          {/* Header */}
           <div style={{ textAlign: "center", marginBottom: "2rem" }} className="auth-card">
             <h1 style={{ marginBottom: "0.5rem" }}>
               {tab === "signin" ? "Welcome back" : "Create an account"}
@@ -201,13 +201,7 @@ export default function AuthPage() {
           </div>
 
           <Card style={{ animationDelay: "0.05s" }} padded={false}>
-            {/* Tabs */}
-            <div
-              style={{
-                display: "flex",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
+            <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
               <button
                 className={`tab-btn ${tab === "signin" ? "active" : ""}`}
                 onClick={() => { setTab("signin"); setSiErrors({}); }}
@@ -223,14 +217,10 @@ export default function AuthPage() {
             </div>
 
             <div style={{ padding: "1.75rem" }}>
-              {/* ── Sign In Form ── */}
               {tab === "signin" && (
                 <form onSubmit={(e) => void handleSignIn(e)} noValidate>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {siErrors.general && (
-                      <Alert tone="error">{siErrors.general}</Alert>
-                    )}
-
+                    {siErrors.general && <Alert tone="error">{siErrors.general}</Alert>}
                     <Input
                       label="Email address"
                       type="email"
@@ -241,7 +231,6 @@ export default function AuthPage() {
                       placeholder="you@example.com"
                       required
                     />
-
                     <Input
                       label="Password"
                       type="password"
@@ -252,28 +241,17 @@ export default function AuthPage() {
                       placeholder="••••••••"
                       required
                     />
-
-                    <Button
-                      type="submit"
-                      fullWidth
-                      loading={siLoading}
-                      size="lg"
-                      style={{ marginTop: "0.25rem" }}
-                    >
+                    <Button type="submit" fullWidth loading={siLoading} size="lg" style={{ marginTop: "0.25rem" }}>
                       Sign in
                     </Button>
                   </div>
                 </form>
               )}
 
-              {/* ── Register Form ── */}
               {tab === "register" && (
                 <form onSubmit={(e) => void handleRegister(e)} noValidate>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {regErrors.general && (
-                      <Alert tone="error">{regErrors.general}</Alert>
-                    )}
-
+                    {regErrors.general && <Alert tone="error">{regErrors.general}</Alert>}
                     <Input
                       label="Full name"
                       type="text"
@@ -283,7 +261,6 @@ export default function AuthPage() {
                       error={regErrors.displayName}
                       placeholder="Jordan Lee"
                     />
-
                     <Input
                       label="Email address"
                       type="email"
@@ -294,7 +271,6 @@ export default function AuthPage() {
                       placeholder="you@example.com"
                       required
                     />
-
                     <Input
                       label="Password"
                       type="password"
@@ -306,17 +282,8 @@ export default function AuthPage() {
                       hint="Minimum 8 characters"
                       required
                     />
-
-                    {/* Role picker */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                      <span
-                        style={{
-                          fontSize: "0.8125rem",
-                          fontWeight: 500,
-                          color: "var(--ink-2)",
-                          letterSpacing: "0.02em",
-                        }}
-                      >
+                      <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)", letterSpacing: "0.02em" }}>
                         I am a…
                       </span>
                       <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -326,9 +293,7 @@ export default function AuthPage() {
                           onClick={() => setRegRole("JOB_SEEKER")}
                         >
                           <span style={{ fontSize: "1.25rem" }}>🔍</span>
-                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>
-                            Job Seeker
-                          </span>
+                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Job Seeker</span>
                           <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
                             Find opportunities that match your skills
                           </span>
@@ -339,23 +304,14 @@ export default function AuthPage() {
                           onClick={() => setRegRole("EMPLOYER")}
                         >
                           <span style={{ fontSize: "1.25rem" }}>🏢</span>
-                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>
-                            Employer
-                          </span>
+                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Employer</span>
                           <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
                             Post jobs and discover candidates
                           </span>
                         </button>
                       </div>
                     </div>
-
-                    <Button
-                      type="submit"
-                      fullWidth
-                      loading={regLoading}
-                      size="lg"
-                      style={{ marginTop: "0.25rem" }}
-                    >
+                    <Button type="submit" fullWidth loading={regLoading} size="lg" style={{ marginTop: "0.25rem" }}>
                       Create account
                     </Button>
                   </div>
@@ -364,15 +320,7 @@ export default function AuthPage() {
             </div>
           </Card>
 
-          {/* Footer note */}
-          <p
-            style={{
-              textAlign: "center",
-              marginTop: "1.25rem",
-              fontSize: "0.8125rem",
-              color: "var(--ink-muted)",
-            }}
-          >
+          <p style={{ textAlign: "center", marginTop: "1.25rem", fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
             By continuing you agree to our terms of service and privacy policy.
           </p>
         </div>

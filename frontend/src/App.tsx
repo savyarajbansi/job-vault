@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { getAccessToken } from "./api/auth";
+import { useAuth } from "./api/authContext";
 
 import AppLayout from "./layout/AppLayout";
 import Home from "./routes/Home";
@@ -9,7 +9,8 @@ import SeekerMatches from "./routes/SeekerMatches";
 import NotFound from "./routes/NotFound";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  if (!getAccessToken()) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
   return <>{children}</>;

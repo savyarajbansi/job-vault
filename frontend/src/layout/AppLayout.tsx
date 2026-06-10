@@ -1,23 +1,20 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { getAccessToken, logout } from "../api/auth";
+import { useAuth } from "../api/authContext";
 import { GlobalStyles } from "../components/ui";
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const [hasSession, setHasSession] = useState(!!getAccessToken());
-
-  useEffect(() => {
-    const check = () => setHasSession(!!getAccessToken());
-    window.addEventListener("storage", check);
-    return () => window.removeEventListener("storage", check);
-  }, []);
+  const { isAuthenticated, user, logout } = useAuth();
 
   const handleLogout = async () => {
-    await logout().catch(() => null);
-    setHasSession(false);
+    await logout();
     navigate("/auth");
   };
+
+  // Derive display name: use name, fall back to email prefix, fall back to "Account"
+  const displayName = user?.displayName
+    || (user?.email ? user.email.split("@")[0] : null)
+    || "Account";
 
   return (
     <>
@@ -46,6 +43,39 @@ export default function AppLayout() {
           transition: color 0.15s, background 0.15s;
         }
         .nav-logout:hover { color: var(--warn); background: var(--warn-faint); }
+        .nav-user-chip {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.25rem 0.625rem 0.25rem 0.375rem;
+          border-radius: 999px;
+          background: var(--bg-subtle);
+          border: 1px solid var(--border);
+        }
+        .nav-avatar {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: var(--accent);
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.6875rem;
+          font-weight: 700;
+          flex-shrink: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
+        .nav-user-name {
+          font-size: 0.8125rem;
+          font-weight: 500;
+          color: var(--ink-2);
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
       `}</style>
 
       {/* Header */}
@@ -72,7 +102,7 @@ export default function AppLayout() {
         >
           {/* Wordmark */}
           <NavLink
-            to={hasSession ? "/seeker" : "/"}
+            to={isAuthenticated ? "/seeker" : "/"}
             style={{ textDecoration: "none", display: "flex", alignItems: "baseline", gap: "0.25rem" }}
           >
             <span
@@ -101,7 +131,7 @@ export default function AppLayout() {
 
           {/* Nav links */}
           <nav style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-            {hasSession ? (
+            {isAuthenticated ? (
               <>
                 <NavLink to="/seeker" className="nav-link">
                   Dashboard
@@ -109,6 +139,15 @@ export default function AppLayout() {
                 <NavLink to="/seeker/matches" className="nav-link">
                   Matches
                 </NavLink>
+
+                {/* User chip */}
+                <div className="nav-user-chip" style={{ marginLeft: "0.5rem" }}>
+                  <div className="nav-avatar">
+                    {displayName.charAt(0)}
+                  </div>
+                  <span className="nav-user-name">{displayName}</span>
+                </div>
+
                 <button className="nav-logout" onClick={() => void handleLogout()}>
                   Sign out
                 </button>
