@@ -1,6 +1,7 @@
 package com.project8.jobvault.applications;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     Optional<JobApplication> findByIdAndJobEmployerId(UUID id, UUID employerId);
 
     Optional<JobApplication> findByIdAndSeekerId(UUID id, UUID seekerId);
+
+    List<JobApplication> findAllByJobIdAndJobEmployerIdOrderBySubmittedAtDesc(UUID jobId, UUID employerId);
 
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)

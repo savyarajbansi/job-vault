@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface JobRepository extends JpaRepository<Job, UUID> {
     List<Job> findAllByStatusOrderByCreatedAtDesc(JobStatus status);
 
+    List<Job> findAllByEmployerIdOrderByCreatedAtDesc(UUID employerId);
+
     Optional<Job> findByIdAndStatus(UUID id, JobStatus status);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

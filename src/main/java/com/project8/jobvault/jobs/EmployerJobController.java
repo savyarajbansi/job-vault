@@ -7,6 +7,7 @@ import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,21 @@ public class EmployerJobController {
         this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
         this.corpusIdfService = corpusIdfService;
         this.clock = clock;
+    }
+
+    @GetMapping
+    public List<JobSummaryResponse> listOwnJobs(@AuthenticationPrincipal JwtPrincipal principal) {
+        UserAccount employer = requireUser(principal);
+        return jobRepository.findAllByEmployerIdOrderByCreatedAtDesc(employer.getId()).stream()
+                .map(job -> new JobSummaryResponse(
+                        job.getId(),
+                        job.getTitle(),
+                        job.getLocation(),
+                        job.getRemoteEligible(),
+                        job.getMinExperienceYears(),
+                        job.getStatus(),
+                        job.getCreatedAt()))
+                .toList();
     }
 
     @PostMapping
