@@ -6,12 +6,50 @@ import Home from "./routes/Home";
 import AuthPage from "./routes/AuthPage";
 import SeekerDashboard from "./routes/SeekerDashboard";
 import SeekerMatches from "./routes/SeekerMatches";
+import EmployerDashboard from "./routes/EmployerDashboard";
+import JobEditor from "./routes/JobEditor";
+import CandidateMatches from "./routes/CandidateMatches";
+import ApplicationReview from "./routes/ApplicationReview";
 import NotFound from "./routes/NotFound";
+import { Spinner } from "./components/ui";
+
+function LoadingGate() {
+  return (
+    <div style={{ minHeight: "calc(100vh - 56px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Spinner size={28} />
+    </div>
+  );
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isSessionReady } = useAuth();
+  if (!isSessionReady) {
+    return <LoadingGate />;
+  }
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
+  }
+  return <>{children}</>;
+}
+
+function RequireRole({
+  role,
+  fallback,
+  children,
+}: {
+  role: "EMPLOYER" | "JOB_SEEKER";
+  fallback: string;
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isSessionReady, roles } = useAuth();
+  if (!isSessionReady) {
+    return <LoadingGate />;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
+  if (!roles.includes(role)) {
+    return <Navigate to={fallback} replace />;
   }
   return <>{children}</>;
 }
@@ -27,17 +65,59 @@ export default function App() {
         <Route
           path="seeker"
           element={
-            <RequireAuth>
+            <RequireRole role="JOB_SEEKER" fallback="/employer">
               <SeekerDashboard />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         <Route
           path="seeker/matches"
           element={
-            <RequireAuth>
+            <RequireRole role="JOB_SEEKER" fallback="/employer">
               <SeekerMatches />
-            </RequireAuth>
+            </RequireRole>
+          }
+        />
+
+        {/* Employer routes */}
+        <Route
+          path="employer"
+          element={
+            <RequireRole role="EMPLOYER" fallback="/seeker">
+              <EmployerDashboard />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="employer/jobs/new"
+          element={
+            <RequireRole role="EMPLOYER" fallback="/seeker">
+              <JobEditor mode="create" />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="employer/jobs/:jobId"
+          element={
+            <RequireRole role="EMPLOYER" fallback="/seeker">
+              <JobEditor mode="edit" />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="employer/jobs/:jobId/matches"
+          element={
+            <RequireRole role="EMPLOYER" fallback="/seeker">
+              <CandidateMatches />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="employer/jobs/:jobId/applications"
+          element={
+            <RequireRole role="EMPLOYER" fallback="/seeker">
+              <ApplicationReview />
+            </RequireRole>
           }
         />
 

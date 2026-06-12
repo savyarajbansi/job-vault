@@ -1,10 +1,230 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { getNotifications, getUnreadNotificationCount, markNotificationRead, NotificationItem } from "../api/notifications";
 import { useAuth } from "../api/authContext";
-import { GlobalStyles } from "../components/ui";
+import { GlobalStyles, Badge, Button, Card, Spinner } from "../components/ui";
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  const diffMs = date.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / 60000);
+  const absMinutes = Math.abs(diffMinutes);
+  if (absMinutes < 60) {
+    return `${absMinutes}m ${diffMinutes >= 0 ? "from now" : "ago"}`;
+  }
+  const diffHours = Math.round(diffMinutes / 60);
+  const absHours = Math.abs(diffHours);
+  if (absHours < 24) {
+    return `${absHours}h ${diffHours >= 0 ? "from now" : "ago"}`;
+  }
+  const diffDays = Math.round(diffHours / 24);
+  return `${Math.abs(diffDays)}d ${diffDays >= 0 ? "from now" : "ago"}`;
+}
+
+function NotificationBell() {
+  const { isAuthenticated, isSessionReady } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [count, setCount] = useState<number | null>(null);
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isSessionReady) {
+      setCount(null);
+      setItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadCount = async () => {
+      try {
+        const response = await getUnreadNotificationCount();
+        if (!cancelled) {
+          setCount(response.unreadCount);
+        }
+      } catch {
+        if (!cancelled) {
+          setCount(null);
+        }
+      }
+    };
+
+    void loadCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSessionReady]);
+
+  useEffect(() => {
+    if (!open || !isAuthenticated || !isSessionReady) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadItems = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await getNotifications();
+        if (!cancelled) {
+          setItems(response);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Could not load notifications.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadItems();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isAuthenticated, isSessionReady]);
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (!panelRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  if (!isAuthenticated || !isSessionReady) {
+    return null;
+  }
+
+  const unread = count ?? 0;
+
+  return (
+    <div ref={panelRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
+        style={{
+          position: "relative",
+          border: "1px solid var(--border)",
+          background: open ? "var(--accent-faint)" : "var(--bg-card)",
+          color: "var(--ink-2)",
+          borderRadius: "999px",
+          padding: "0.4rem 0.75rem",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          transition: "background 0.15s, border-color 0.15s, color 0.15s",
+        }}
+      >
+        <span aria-hidden="true">🔔</span>
+        <span style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Alerts</span>
+        {unread > 0 && (
+          <span
+            style={{
+              minWidth: 18,
+              height: 18,
+              padding: "0 0.35rem",
+              borderRadius: 999,
+              background: "var(--warn)",
+              color: "#fff",
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <Card
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "calc(100% + 0.6rem)",
+            width: 360,
+            maxWidth: "calc(100vw - 2rem)",
+            zIndex: 120,
+            boxShadow: "var(--shadow-lg)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+            <h2 style={{ fontSize: "1rem" }}>Notifications</h2>
+            {loading && <Spinner size={16} />}
+          </div>
+
+          {error && <p style={{ color: "var(--warn)", fontSize: "0.875rem", marginBottom: "0.75rem" }}>{error}</p>}
+
+          {!loading && items.length === 0 && !error && (
+            <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>No unread updates.</p>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: 360, overflowY: "auto" }}>
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={async () => {
+                  if (!item.isRead) {
+                    try {
+                      await markNotificationRead(item.id);
+                      setItems((current) =>
+                        current.map((notification) =>
+                          notification.id === item.id ? { ...notification, isRead: true } : notification
+                        )
+                      );
+                      setCount((current) => Math.max(0, (current ?? 0) - 1));
+                    } catch {
+                      setError("Could not mark notification as read.");
+                    }
+                  }
+                }}
+                style={{
+                  textAlign: "left",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  background: item.isRead ? "var(--bg-card)" : "var(--accent-faint)",
+                  padding: "0.75rem",
+                  color: "inherit",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                      <Badge tone={item.isRead ? "neutral" : "accent"}>{item.type.replace(/_/g, " ")}</Badge>
+                      {!item.isRead && <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>Unread</span>}
+                    </div>
+                    <p style={{ fontSize: "0.875rem", color: "var(--ink-2)", lineHeight: 1.5 }}>{item.message}</p>
+                  </div>
+                </div>
+                <p style={{ marginTop: "0.45rem", fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                  {formatRelativeTime(item.createdAt)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, isSessionReady, roles, user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -15,6 +235,8 @@ export default function AppLayout() {
   const displayName = user?.displayName
     || (user?.email ? user.email.split("@")[0] : null)
     || "Account";
+  const isEmployer = roles.includes("EMPLOYER");
+  const homeRoute = isEmployer ? "/employer" : "/seeker";
 
   return (
     <>
@@ -102,7 +324,7 @@ export default function AppLayout() {
         >
           {/* Wordmark */}
           <NavLink
-            to={isAuthenticated ? "/seeker" : "/"}
+            to={isAuthenticated ? homeRoute : "/"}
             style={{ textDecoration: "none", display: "flex", alignItems: "baseline", gap: "0.25rem" }}
           >
             <span
@@ -131,14 +353,29 @@ export default function AppLayout() {
 
           {/* Nav links */}
           <nav style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-            {isAuthenticated ? (
+            {isAuthenticated && isSessionReady ? (
               <>
-                <NavLink to="/seeker" className="nav-link">
-                  Dashboard
-                </NavLink>
-                <NavLink to="/seeker/matches" className="nav-link">
-                  Matches
-                </NavLink>
+                {isEmployer ? (
+                  <>
+                    <NavLink to="/employer" className="nav-link">
+                      Dashboard
+                    </NavLink>
+                    <NavLink to="/employer/jobs/new" className="nav-link">
+                      Post a job
+                    </NavLink>
+                  </>
+                ) : (
+                  <>
+                    <NavLink to="/seeker" className="nav-link">
+                      Dashboard
+                    </NavLink>
+                    <NavLink to="/seeker/matches" className="nav-link">
+                      Matches
+                    </NavLink>
+                  </>
+                )}
+
+                <NotificationBell />
 
                 {/* User chip */}
                 <div className="nav-user-chip" style={{ marginLeft: "0.5rem" }}>
@@ -152,6 +389,11 @@ export default function AppLayout() {
                   Sign out
                 </button>
               </>
+            ) : isAuthenticated && !isSessionReady ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <Spinner size={18} />
+                <span style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>Restoring session</span>
+              </div>
             ) : (
               <NavLink to="/auth" className="nav-link">
                 Sign in

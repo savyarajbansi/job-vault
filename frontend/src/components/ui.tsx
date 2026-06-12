@@ -260,6 +260,56 @@ export function Badge({
   );
 }
 
+/* ─── Score bar ───────────────────────────────────────────────── */
+function scoreTone(value: number): BadgeTone {
+  if (value >= 0.7) return "success";
+  if (value >= 0.4) return "warn";
+  return "neutral";
+}
+
+function scoreColor(value: number): string {
+  if (value >= 0.7) return "var(--success)";
+  if (value >= 0.4) return "#B07D20";
+  return "var(--ink-muted)";
+}
+
+export function ScoreBar({ value, label }: { value: number; label: string }) {
+  const clamped = Math.max(0, Math.min(1, value));
+  const percent = Math.round(clamped * 100);
+  const tone = scoreTone(clamped);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+        <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>{label}</span>
+        <Badge tone={tone}>{percent}%</Badge>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-valuetext={`${percent}% ${label}`}
+        style={{
+          height: 4,
+          borderRadius: 999,
+          background: "var(--bg-subtle)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${percent}%`,
+            background: scoreColor(clamped),
+            borderRadius: 999,
+            transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ─── Divider ─────────────────────────────────────────────────── */
 export function Divider({ label }: { label?: string }) {
   if (!label) {

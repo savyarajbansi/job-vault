@@ -5,50 +5,13 @@ import {
   SeekerJobMatchResponse,
   SeekerMatchItem,
 } from "../api/seeker";
-import { Button, Alert, Card, Badge, Spinner } from "../components/ui";
+import { Button, Alert, Card, Badge, Spinner, ScoreBar } from "../components/ui";
 
 function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
   if (score >= 0.4) return "#B07D20";
   return "var(--ink-muted)";
-}
-
-function scoreTone(score: number): "success" | "warn" | "neutral" {
-  if (score >= 0.7) return "success";
-  if (score >= 0.4) return "warn";
-  return "neutral";
-}
-
-function ScoreBar({ value, label }: { value: number; label: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>{label}</span>
-        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--ink-2)" }}>
-          {Math.round(value * 100)}%
-        </span>
-      </div>
-      <div
-        style={{
-          height: 4,
-          borderRadius: 999,
-          background: "var(--bg-subtle)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${Math.round(value * 100)}%`,
-            background: scoreColor(value),
-            borderRadius: 999,
-            transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
+ }
 
 export default function SeekerMatches() {
   const [matches, setMatches] = useState<SeekerJobMatchResponse | null>(null);

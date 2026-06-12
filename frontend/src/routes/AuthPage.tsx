@@ -1,10 +1,9 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAccessToken } from "../api/auth";
 import { useAuth } from "../api/authContext";
 import { ApiResponseError, request } from "../api/client";
 import { AuthTokensResponse } from "../api/auth";
-import { Button, Input, Alert, Card } from "../components/ui";
+import { Button, Input, Alert, Card, Spinner } from "../components/ui";
 
 type Tab = "signin" | "register";
 type Role = "JOB_SEEKER" | "EMPLOYER";
@@ -59,12 +58,15 @@ async function registerUser(
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { login, setUser } = useAuth();
+  const { login, setUser, isAuthenticated, isSessionReady, roles } = useAuth();
   const [tab, setTab] = useState<Tab>("signin");
 
   useEffect(() => {
-    if (getAccessToken()) navigate("/seeker", { replace: true });
-  }, [navigate]);
+    if (!isSessionReady || !isAuthenticated) {
+      return;
+    }
+    navigate(roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
+  }, [navigate, isAuthenticated, isSessionReady, roles]);
 
   // Sign-in state
   const [siEmail, setSiEmail] = useState("");
@@ -87,10 +89,14 @@ export default function AuthPage() {
     if (!siPassword) { setSiErrors({ password: "Password is required." }); return; }
     setSiLoading(true);
     try {
-      await login(siEmail, siPassword);
-      // setUser with displayName derived from email for now; dashboard will fetch real profile
-      setUser({ email: siEmail, displayName: null });
-      navigate("/seeker", { replace: true });
+      const result = await login(siEmail, siPassword);
+      setUser({
+        id: result.user.id,
+        email: siEmail,
+        displayName: null,
+        roles: result.user.roles,
+      });
+      navigate(result.user.roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
       if (raw.includes("ERR_AUTH_002") || raw.toLowerCase().includes("invalid")) {
@@ -114,10 +120,14 @@ export default function AuthPage() {
     setRegLoading(true);
     try {
       await registerUser(regEmail, regPassword, regDisplay, regRole);
-      // Now login so auth state is set properly
-      await login(regEmail, regPassword);
-      setUser({ email: regEmail, displayName: regDisplay || null });
-      navigate("/seeker", { replace: true });
+      const result = await login(regEmail, regPassword);
+      setUser({
+        id: result.user.id,
+        email: regEmail,
+        displayName: regDisplay || null,
+        roles: result.user.roles,
+      });
+      navigate(result.user.roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
     } catch (err) {
       const payload = err instanceof ApiResponseError ? err.payload : undefined;
       const parsed = parseFieldErrors(payload);
@@ -179,6 +189,19 @@ export default function AuthPage() {
         .role-card:hover:not(.selected) { border-color: var(--ink-muted); }
       `}</style>
 
+      {!isSessionReady ? (
+        <div
+          style={{
+            minHeight: "calc(100vh - 56px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "2rem 1rem",
+          }}
+        >
+          <Spinner size={28} />
+        </div>
+      ) : (
       <div
         style={{
           minHeight: "calc(100vh - 56px)",
@@ -325,6 +348,7 @@ export default function AuthPage() {
           </p>
         </div>
       </div>
+      )}
     </>
   );
 }
