@@ -1,4 +1,5 @@
 import { authorizedRequest } from "./auth";
+import { EducationRequirement } from "./employer";
 
 export type ResumeUploadResult = {
   resumeId: string;
@@ -32,14 +33,24 @@ export type MatchPage = {
   total: number;
 };
 
+// Mirrors SeekerJobMatchResponse.JobInfo on the backend — keep in sync with
+// MatchingFacade#toJobInfo and SeekerJobMatchResponse.java.
+export type JobInfo = {
+  title: string;
+  companyName: string | null;
+  location: string | null;
+  remoteEligible: boolean;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  educationRequirement: EducationRequirement | null;
+  requiredSkills: string[];
+};
+
 export type SeekerMatchItem = {
   jobId: string;
   score: number;
   factors: MatchFactors;
-  job: {
-    title: string;
-    remoteEligible: boolean;
-  };
+  job: JobInfo;
   missingSkills: string[];
 };
 
@@ -81,10 +92,9 @@ export type SeekerProfileUpdate = {
 export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult> {
   const formData = new FormData();
   formData.set("file", file);
-
   return authorizedRequest<ResumeUploadResult>("/api/seeker/resumes/upload", {
     method: "POST",
-    body: formData
+    body: formData,
   });
 }
 
@@ -93,7 +103,7 @@ export async function getSeekerResumeHistory(
 ): Promise<ResumeHistoryResponse> {
   const query = new URLSearchParams({
     limit: String(params.limit),
-    offset: String(params.offset)
+    offset: String(params.offset),
   });
   return authorizedRequest<ResumeHistoryResponse>(
     `/api/seeker/resumes?${query.toString()}`,
@@ -106,7 +116,7 @@ export async function getSeekerMatches(
 ): Promise<SeekerJobMatchResponse> {
   const query = new URLSearchParams({
     limit: String(params.limit),
-    offset: String(params.offset)
+    offset: String(params.offset),
   });
   return authorizedRequest<SeekerJobMatchResponse>(
     `/api/seeker/matches/jobs?${query.toString()}`,
@@ -115,19 +125,22 @@ export async function getSeekerMatches(
 }
 
 export async function getSeekerSkillGaps(jobId: string): Promise<SkillGapResponse> {
-  return authorizedRequest<SkillGapResponse>(`/api/seeker/jobs/${jobId}/skill-gaps`, {
-    method: "GET"
-  });
+  return authorizedRequest<SkillGapResponse>(
+    `/api/seeker/jobs/${jobId}/skill-gaps`,
+    { method: "GET" }
+  );
 }
 
 export async function getSeekerProfile(): Promise<SeekerProfile> {
   return authorizedRequest<SeekerProfile>("/api/seeker/profile", { method: "GET" });
 }
 
-export async function updateSeekerProfile(data: SeekerProfileUpdate): Promise<SeekerProfile> {
+export async function updateSeekerProfile(
+  data: SeekerProfileUpdate
+): Promise<SeekerProfile> {
   return authorizedRequest<SeekerProfile>("/api/seeker/profile", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }

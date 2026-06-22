@@ -5,12 +5,14 @@ import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobDetailResponse;
 import com.project8.jobvault.jobs.JobModerationAction;
 import com.project8.jobvault.jobs.JobRepository;
+import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.matching.CorpusIdfService;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +58,8 @@ public class AdminJobModerationController {
         if (rows == 0) {
             throw resolveMissingOrConflict(jobId);
         }
-        // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
+        // @Modifying(clearAutomatically = true) ensures we read the post-update entity
+        // state.
         Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         corpusIdfService.rebuildFromRepository();
@@ -94,7 +97,8 @@ public class AdminJobModerationController {
         if (rows == 0) {
             throw resolveMissingOrConflict(jobId);
         }
-        // @Modifying(clearAutomatically = true) ensures we read the post-update entity state.
+        // @Modifying(clearAutomatically = true) ensures we read the post-update entity
+        // state.
         Job updated = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         corpusIdfService.rebuildFromRepository();
@@ -128,13 +132,25 @@ public class AdminJobModerationController {
     }
 
     private JobDetailResponse toDetail(Job job) {
+        List<String> requiredSkills = job.getRequiredSkills() == null
+                ? List.of()
+                : job.getRequiredSkills().stream()
+                        .map(Skill::getName)
+                        .filter(Objects::nonNull)
+                        .sorted()
+                        .toList();
         return new JobDetailResponse(
                 job.getId(),
                 job.getTitle(),
                 job.getDescription(),
+                job.getCompanyName(),
                 job.getLocation(),
                 job.getRemoteEligible(),
                 job.getMinExperienceYears(),
+                job.getSalaryMin(),
+                job.getSalaryMax(),
+                job.getEducationRequirement(),
+                requiredSkills,
                 job.getStatus(),
                 job.getCreatedAt(),
                 job.getUpdatedAt(),
