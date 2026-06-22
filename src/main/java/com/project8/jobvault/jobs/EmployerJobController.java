@@ -2,6 +2,7 @@ package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.matching.CorpusIdfService;
+import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
@@ -51,14 +52,7 @@ public class EmployerJobController {
     public List<JobSummaryResponse> listOwnJobs(@AuthenticationPrincipal JwtPrincipal principal) {
         UserAccount employer = requireUser(principal);
         return jobRepository.findAllByEmployerIdOrderByCreatedAtDesc(employer.getId()).stream()
-                .map(job -> new JobSummaryResponse(
-                        job.getId(),
-                        job.getTitle(),
-                        job.getLocation(),
-                        job.getRemoteEligible(),
-                        job.getMinExperienceYears(),
-                        job.getStatus(),
-                        job.getCreatedAt()))
+                .map(this::toSummary)
                 .toList();
     }
 
@@ -72,9 +66,13 @@ public class EmployerJobController {
         job.setEmployer(employer);
         job.setTitle(request.title());
         job.setDescription(request.description());
-        job.setLocation(normalizeLocation(request.location()));
+        job.setCompanyName(normalizeText(request.companyName()));
+        job.setLocation(normalizeText(request.location()));
         job.setRemoteEligible(request.remoteEligible());
         job.setMinExperienceYears(request.minExperienceYears());
+        job.setSalaryMin(request.salaryMin());
+        job.setSalaryMax(request.salaryMax());
+        job.setEducationRequirement(request.educationRequirement());
         job.setStatus(JobStatus.DRAFT);
         Job saved = jobRepository.save(job);
         refreshIdfCorpus();
@@ -108,9 +106,13 @@ public class EmployerJobController {
         }
         job.setTitle(request.title());
         job.setDescription(request.description());
-        job.setLocation(normalizeLocation(request.location()));
+        job.setCompanyName(normalizeText(request.companyName()));
+        job.setLocation(normalizeText(request.location()));
         job.setRemoteEligible(request.remoteEligible());
         job.setMinExperienceYears(request.minExperienceYears());
+        job.setSalaryMin(request.salaryMin());
+        job.setSalaryMax(request.salaryMax());
+        job.setEducationRequirement(request.educationRequirement());
         Job saved = jobRepository.save(job);
         syncRequiredSkills(saved);
         refreshIdfCorpus();
@@ -164,6 +166,8 @@ public class EmployerJobController {
         return ResponseEntity.ok(toDetail(saved));
     }
 
+    // ── Private helpers ────────────────────────────────────────────────────────
+
     private void throwNotFoundOrConflict(UUID jobId, UUID employerId, String conflictReason) {
         UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
         Optional<Job> existing = jobRepository.findById(resolvedJobId);
@@ -181,11 +185,9 @@ public class EmployerJobController {
         if (jobId == null || employerId == null) {
             return Optional.empty();
         }
-        UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");
-        UUID resolvedEmployerId = Objects.requireNonNull(employerId, "employerId");
-        return jobRepository.findById(resolvedJobId)
+        return jobRepository.findById(jobId)
                 .filter(job -> job.getEmployer() != null)
-                .filter(job -> resolvedEmployerId.equals(job.getEmployer().getId()));
+                .filter(job -> employerId.equals(job.getEmployer().getId()));
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {
@@ -209,28 +211,52 @@ public class EmployerJobController {
         corpusIdfService.rebuildFromRepository();
     }
 
+    private JobSummaryResponse toSummary(Job job) {
+        return new JobSummaryResponse(
+                job.getId(),
+                job.getTitle(),
+                job.getCompanyName(),
+                job.getLocation(),
+                job.getRemoteEligible(),
+                job.getMinExperienceYears(),
+                job.getSalaryMin(),
+                job.getSalaryMax(),
+                job.getStatus(),
+                job.getCreatedAt());
+    }
+
     private JobDetailResponse toDetail(Job job) {
-        Instant createdAt = job.getCreatedAt();
-        Instant updatedAt = job.getUpdatedAt();
+        List<String> requiredSkills = job.getRequiredSkills() == null
+                ? List.of()
+                : job.getRequiredSkills().stream()
+                        .map(Skill::getName)
+                        .filter(Objects::nonNull)
+                        .sorted()
+                        .toList();
         return new JobDetailResponse(
                 job.getId(),
                 job.getTitle(),
                 job.getDescription(),
+                job.getCompanyName(),
                 job.getLocation(),
                 job.getRemoteEligible(),
                 job.getMinExperienceYears(),
+                job.getSalaryMin(),
+                job.getSalaryMax(),
+                job.getEducationRequirement(),
+                requiredSkills,
                 job.getStatus(),
-                createdAt,
-                updatedAt,
+                job.getCreatedAt(),
+                job.getUpdatedAt(),
                 job.getPublishedAt(),
                 job.getDisabledAt());
     }
 
-    private String normalizeLocation(String location) {
-        if (location == null) {
+    private String normalizeText(String value) {
+        if (value == null) {
             return null;
         }
-        String trimmed = location.trim();
+        String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 }

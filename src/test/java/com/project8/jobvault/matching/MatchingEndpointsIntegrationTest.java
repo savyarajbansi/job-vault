@@ -138,9 +138,13 @@ class MatchingEndpointsIntegrationTest {
                 "Backend Engineer",
                 "Java Spring SQL microservices",
                 Set.of(skill("java"), skill("spring"), skill("kubernetes")));
+        strongMatchJob.setCompanyName("Acme Corp");
         strongMatchJob.setLocation("Austin, TX");
         strongMatchJob.setRemoteEligible(false);
         strongMatchJob.setMinExperienceYears(3);
+        strongMatchJob.setSalaryMin(80000);
+        strongMatchJob.setSalaryMax(120000);
+
         weakMatchJob = buildJob(
                 employerUser,
                 JobStatus.ACTIVE,
@@ -197,6 +201,9 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(jsonPath("$.items[0].missingSkills[0]").value("kubernetes"))
                 .andExpect(jsonPath("$.items[0].factors.experience").value(1.0))
                 .andExpect(jsonPath("$.items[0].factors.location").value(1.0))
+                .andExpect(jsonPath("$.items[0].job.companyName").value("Acme Corp"))
+                .andExpect(jsonPath("$.items[0].job.salaryMin").value(80000))
+                .andExpect(jsonPath("$.items[0].job.salaryMax").value(120000))
                 .andExpect(jsonPath("$.page.total").value(2));
     }
 
@@ -226,6 +233,8 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(jsonPath("$[0].score").value(10.5));
     }
 
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
     private String issueToken(UserAccount user) {
         return jwtTokenService.issueAccessToken(user).token();
     }
@@ -252,7 +261,8 @@ class MatchingEndpointsIntegrationTest {
         return account;
     }
 
-    private Job buildJob(UserAccount employer, JobStatus status, String title, String description, Set<Skill> requiredSkills) {
+    private Job buildJob(UserAccount employer, JobStatus status, String title, String description,
+            Set<Skill> requiredSkills) {
         Job job = new TestJob();
         job.setId(UUID.randomUUID());
         job.setEmployer(employer);
@@ -270,7 +280,8 @@ class MatchingEndpointsIntegrationTest {
         return skill;
     }
 
-    private record TestTrendingSkillRow(UUID skillId, String skillName, BigDecimal score) implements TrendingSkillRow {
+    private record TestTrendingSkillRow(UUID skillId, String skillName, BigDecimal score)
+            implements TrendingSkillRow {
         @Override
         public UUID getSkillId() {
             return skillId;

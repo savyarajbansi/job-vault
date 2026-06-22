@@ -40,6 +40,9 @@ public class Job {
     @Column(nullable = false, columnDefinition = "text")
     private String description;
 
+    @Column(name = "company_name", length = 200)
+    private String companyName;
+
     @Column(name = "location", length = 150)
     private String location;
 
@@ -48,6 +51,16 @@ public class Job {
 
     @Column(name = "min_experience_years")
     private Integer minExperienceYears;
+
+    @Column(name = "salary_min")
+    private Integer salaryMin;
+
+    @Column(name = "salary_max")
+    private Integer salaryMax;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "education_requirement", length = 50)
+    private EducationRequirement educationRequirement;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -123,6 +136,14 @@ public class Job {
         this.description = description;
     }
 
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
     public String getLocation() {
         return location;
     }
@@ -145,6 +166,30 @@ public class Job {
 
     public void setMinExperienceYears(Integer minExperienceYears) {
         this.minExperienceYears = minExperienceYears;
+    }
+
+    public Integer getSalaryMin() {
+        return salaryMin;
+    }
+
+    public void setSalaryMin(Integer salaryMin) {
+        this.salaryMin = salaryMin;
+    }
+
+    public Integer getSalaryMax() {
+        return salaryMax;
+    }
+
+    public void setSalaryMax(Integer salaryMax) {
+        this.salaryMax = salaryMax;
+    }
+
+    public EducationRequirement getEducationRequirement() {
+        return educationRequirement;
+    }
+
+    public void setEducationRequirement(EducationRequirement educationRequirement) {
+        this.educationRequirement = educationRequirement;
     }
 
     public Set<Skill> getRequiredSkills() {

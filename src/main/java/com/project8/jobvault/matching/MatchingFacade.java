@@ -76,13 +76,12 @@ public class MatchingFacade {
                             item.job.getId(),
                             item.breakdown.overallScore(),
                             item.breakdown.factors(),
-                            new SeekerJobMatchResponse.JobInfo(
-                                    item.job.getTitle(),
-                                    Boolean.TRUE.equals(item.job.getRemoteEligible())),
+                            toJobInfo(item.job),
                             item.breakdown.missingSkills()));
                 }
             }
-            SeekerJobMatchResponse response = new SeekerJobMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
+            SeekerJobMatchResponse response = new SeekerJobMatchResponse(
+                    items, new MatchPage(safeLimit, safeOffset, total));
             recordMatchAttempt(null, resume, MatchAttemptStatus.SUCCESS, null, startNanos, items.size());
             return response;
         } catch (ResponseStatusException ex) {
@@ -120,8 +119,8 @@ public class MatchingFacade {
             List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = new ArrayList<>();
             if (safeOffset < end) {
                 for (ScoredResume item : scored.subList(safeOffset, end)) {
-                    UserAccount seeker = item.resume.getSeeker();
-                    UUID seekerId = seeker == null ? null : seeker.getId();
+                    UserAccount seekerAccount = item.resume.getSeeker();
+                    UUID seekerId = seekerAccount == null ? null : seekerAccount.getId();
                     if (seekerId == null) {
                         continue;
                     }
@@ -133,7 +132,8 @@ public class MatchingFacade {
                             item.breakdown.missingSkills()));
                 }
             }
-            EmployerCandidateMatchResponse response = new EmployerCandidateMatchResponse(items, new MatchPage(safeLimit, safeOffset, total));
+            EmployerCandidateMatchResponse response = new EmployerCandidateMatchResponse(
+                    items, new MatchPage(safeLimit, safeOffset, total));
             recordMatchAttempt(job, null, MatchAttemptStatus.SUCCESS, null, startNanos, items.size());
             return response;
         } catch (ResponseStatusException ex) {
@@ -156,13 +156,16 @@ public class MatchingFacade {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
             ScoredBreakdown breakdown = scoreResumeAgainstJob(resume, job, seeker);
             SkillGapResponse response = new SkillGapResponse(jobId, breakdown.missingSkills());
-            recordMatchAttempt(job, resume, MatchAttemptStatus.SUCCESS, null, startNanos, breakdown.missingSkills().size());
+            recordMatchAttempt(job, resume, MatchAttemptStatus.SUCCESS, null, startNanos,
+                    breakdown.missingSkills().size());
             return response;
         } catch (ResponseStatusException ex) {
             recordMatchAttempt(job, resume, MatchAttemptStatus.FAILED, "ERR_MATCH_002", startNanos, null);
             throw ex;
         }
     }
+
+    // ── Scoring ────────────────────────────────────────────────────────────────
 
     private ScoredBreakdown scoreResumeAgainstJob(ResumeMetadata resume, Job job, UserAccount seeker) {
         List<String> resumeTokens = textTokenizer.tokenize(orEmpty(resume.getParsedText()));
@@ -177,7 +180,8 @@ public class MatchingFacade {
             idf = InverseDocumentFrequency.compute(fallbackCorpus);
         }
         TfIdfVectorizer vectorizer = new TfIdfVectorizer(idf);
-        double cosineScore = CosineSimilarity.compute(vectorizer.vectorize(resumeTokens), vectorizer.vectorize(jobTokens));
+        double cosineScore = CosineSimilarity.compute(
+                vectorizer.vectorize(resumeTokens), vectorizer.vectorize(jobTokens));
 
         Set<Skill> requiredSkills = job.getRequiredSkills() == null ? Set.of() : job.getRequiredSkills();
         Set<String> requiredSkillNames = requiredSkills.stream()
@@ -192,7 +196,9 @@ public class MatchingFacade {
                 overlapCount++;
             }
         }
-        double skillsOverlap = requiredSkillNames.isEmpty() ? 0.0 : (double) overlapCount / requiredSkillNames.size();
+        double skillsOverlap = requiredSkillNames.isEmpty()
+                ? 0.0
+                : (double) overlapCount / requiredSkillNames.size();
         List<String> missingSkills = requiredSkillNames.stream()
                 .filter(required -> !resumeSkills.contains(required))
                 .sorted()
@@ -210,6 +216,29 @@ public class MatchingFacade {
                 new MatchFactorBreakdown(cosineScore, skillsOverlap, experienceScore, locationScore),
                 missingSkills);
     }
+
+    // ── JobInfo mapping ────────────────────────────────────────────────────────
+
+    private SeekerJobMatchResponse.JobInfo toJobInfo(Job job) {
+        List<String> requiredSkills = job.getRequiredSkills() == null
+                ? List.of()
+                : job.getRequiredSkills().stream()
+                        .map(Skill::getName)
+                        .filter(Objects::nonNull)
+                        .sorted()
+                        .toList();
+        return new SeekerJobMatchResponse.JobInfo(
+                job.getTitle(),
+                job.getCompanyName(),
+                job.getLocation(),
+                job.getRemoteEligible(),
+                job.getSalaryMin(),
+                job.getSalaryMax(),
+                job.getEducationRequirement(),
+                requiredSkills);
+    }
+
+    // ── Utilities ──────────────────────────────────────────────────────────────
 
     private String orEmpty(String value) {
         return value == null ? "" : value;
@@ -288,21 +317,7 @@ public class MatchingFacade {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private record ScoredBreakdown(
-            double overallScore,
-            MatchFactorBreakdown factors,
-            List<String> missingSkills) {
-    }
-
-    private record ScoredJob(
-            Job job,
-            ScoredBreakdown breakdown) {
-    }
-
-    private record ScoredResume(
-            ResumeMetadata resume,
-            ScoredBreakdown breakdown) {
-    }
+    // ── Audit ──────────────────────────────────────────────────────────────────
 
     private void recordMatchAttempt(
             Job job,
@@ -331,6 +346,8 @@ public class MatchingFacade {
         return millis > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) millis;
     }
 
+    // ── Repository accessors ───────────────────────────────────────────────────
+
     private JobRepository jobRepository() {
         JobRepository repository = jobRepositoryProvider.getIfAvailable();
         if (repository == null) {
@@ -345,5 +362,23 @@ public class MatchingFacade {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Matching service unavailable");
         }
         return repository;
+    }
+
+    // ── Inner records ──────────────────────────────────────────────────────────
+
+    private record ScoredBreakdown(
+            double overallScore,
+            MatchFactorBreakdown factors,
+            List<String> missingSkills) {
+    }
+
+    private record ScoredJob(
+            Job job,
+            ScoredBreakdown breakdown) {
+    }
+
+    private record ScoredResume(
+            ResumeMetadata resume,
+            ScoredBreakdown breakdown) {
     }
 }

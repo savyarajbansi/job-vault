@@ -1,11 +1,13 @@
 package com.project8.jobvault.matching;
 
+import com.project8.jobvault.jobs.EducationRequirement;
 import java.util.List;
 import java.util.UUID;
 
 public record SeekerJobMatchResponse(
         List<SeekerJobMatchResponseItem> items,
         MatchPage page) {
+
     public record SeekerJobMatchResponseItem(
             UUID jobId,
             double score,
@@ -16,6 +18,12 @@ public record SeekerJobMatchResponse(
 
     public record JobInfo(
             String title,
-            boolean remoteEligible) {
+            String companyName,
+            String location,
+            Boolean remoteEligible,
+            Integer salaryMin,
+            Integer salaryMax,
+            EducationRequirement educationRequirement,
+            List<String> requiredSkills) {
     }
 }
