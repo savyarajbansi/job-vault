@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -218,6 +219,17 @@ public class ResumeUploadController {
                 .collect(Collectors.joining(","));
     }
 
+    private List<String> splitSkills(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .toList();
+    }
+
     private ResumeHistoryResponse.ResumeHistoryItem toHistoryItem(ResumeMetadata resume) {
         return new ResumeHistoryResponse.ResumeHistoryItem(
                 resume.getId(),
@@ -225,7 +237,8 @@ public class ResumeUploadController {
                 resume.getProcessingStatus(),
                 resume.getFailureCode(),
                 resume.getCreatedAt(),
-                resume.getParsedAt());
+                resume.getParsedAt(),
+                splitSkills(resume.getInferredSkills()));
     }
 
     private void recordParseAttempt(

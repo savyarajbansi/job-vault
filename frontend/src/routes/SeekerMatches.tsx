@@ -5,6 +5,7 @@ import {
   SeekerJobMatchResponse,
   SeekerMatchItem,
 } from "../api/seeker";
+import { formatSalaryRange, EDUCATION_LABELS } from "../api/employer";
 import { Button, Alert, Card, Badge, Spinner, ScoreBar } from "../components/ui";
 
 function scoreColor(score: number): string {
@@ -72,6 +73,9 @@ export default function SeekerMatches() {
 
   const total = matches?.page.total ?? 0;
   const totalPages = Math.ceil(total / limit);
+  const selectedSalaryLabel = selected
+    ? formatSalaryRange(selected.job.salaryMin, selected.job.salaryMax)
+    : null;
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -102,6 +106,7 @@ export default function SeekerMatches() {
 
             {matches.items.map((item, idx) => {
               const isSelected = selected?.jobId === item.jobId;
+              const salaryLabel = formatSalaryRange(item.job.salaryMin, item.job.salaryMax);
               return (
                 <button
                   key={item.jobId}
@@ -123,13 +128,20 @@ export default function SeekerMatches() {
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: "0.9375rem", marginBottom: "0.25rem" }}>
+                      <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: "0.9375rem", marginBottom: "0.125rem" }}>
                         {item.job.title}
                       </div>
+                      {item.job.companyName && (
+                        <div style={{ fontSize: "0.8125rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.4rem" }}>
+                          {item.job.companyName}
+                        </div>
+                      )}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                        {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
                         {item.job.remoteEligible && (
                           <Badge tone="accent">Remote eligible</Badge>
                         )}
+                        {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
                         {item.missingSkills.length === 0 ? (
                           <Badge tone="success">Strong match</Badge>
                         ) : (
@@ -189,8 +201,20 @@ export default function SeekerMatches() {
               <Card style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 {/* Header */}
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--ink)", marginBottom: "0.5rem" }}>
+                  <div style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--ink)", marginBottom: "0.25rem" }}>
                     {selected.job.title}
+                  </div>
+                  {selected.job.companyName && (
+                    <div style={{ fontSize: "0.875rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.625rem" }}>
+                      {selected.job.companyName}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.75rem" }}>
+                    {selected.job.location && <Badge tone="neutral">{selected.job.location}</Badge>}
+                    {selectedSalaryLabel && <Badge tone="neutral">{selectedSalaryLabel}</Badge>}
+                    {selected.job.educationRequirement && (
+                      <Badge tone="neutral">{EDUCATION_LABELS[selected.job.educationRequirement]}</Badge>
+                    )}
                   </div>
                   <div
                     style={{
@@ -226,6 +250,35 @@ export default function SeekerMatches() {
                   <ScoreBar value={selected.factors.experience} label="Experience" />
                   <ScoreBar value={selected.factors.location} label="Location" />
                 </div>
+
+                {/* Required skills */}
+                {selected.job.requiredSkills.length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-muted)", marginBottom: "0.625rem" }}>
+                      Required skills
+                    </h4>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+                      {selected.job.requiredSkills.map((skill) => {
+                        const isMissing = selected.missingSkills.includes(skill);
+                        return (
+                          <span
+                            key={skill}
+                            style={{
+                              padding: "0.25rem 0.625rem",
+                              background: isMissing ? "var(--warn-faint)" : "var(--success-faint)",
+                              color: isMissing ? "var(--warn)" : "var(--success)",
+                              borderRadius: "999px",
+                              fontSize: "0.8125rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {skill}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Skill gaps */}
                 <div>

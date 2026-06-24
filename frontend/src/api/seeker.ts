@@ -13,6 +13,7 @@ export type ResumeHistoryItem = {
   failureCode: string | null;
   createdAt: string;
   parsedAt: string | null;
+  inferredSkills: string[];
 };
 
 export type ResumeHistoryResponse = {

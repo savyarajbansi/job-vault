@@ -13,7 +13,8 @@ public record ResumeHistoryResponse(
             ResumeProcessingStatus status,
             String failureCode,
             Instant createdAt,
-            Instant parsedAt) {
+            Instant parsedAt,
+            List<String> inferredSkills) {
     }
 
     public record ResumeHistoryPage(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useMemo, useRef, FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   uploadSeekerResume,
@@ -43,6 +43,7 @@ type ResumeDrawerItem = {
   failureCode: string | null;
   createdAt: string;
   parsedAt: string | null;
+  inferredSkills: string[];
 };
 
 /* ── Resume detail drawer ─────────────────────────────────────── */
@@ -139,6 +140,32 @@ function ResumeDrawer({
             </span>
           </div>
         </div>
+
+        {/* Detected skills */}
+        {resume.inferredSkills.length > 0 && (
+          <div style={{ marginBottom: "1.5rem" }}>
+            <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", fontWeight: 500, marginBottom: "0.625rem" }}>
+              Detected skills
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+              {resume.inferredSkills.map((skill) => (
+                <span
+                  key={skill}
+                  style={{
+                    padding: "0.2rem 0.55rem",
+                    background: "var(--accent-faint)",
+                    color: "var(--accent)",
+                    borderRadius: "999px",
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ height: "1px", background: "var(--border)", marginBottom: "1.5rem" }} />
 
@@ -400,7 +427,6 @@ export default function SeekerDashboard() {
     try {
       const result = await getSeekerProfile();
       setProfile(result);
-      // Update nav display name if we can derive one from profile sector (no name field on profile)
     } catch {
       // Profile load failure is non-fatal
     } finally {
@@ -412,6 +438,19 @@ export default function SeekerDashboard() {
     void loadHistory();
     void loadProfile();
   }, []);
+
+  // The resume actually used for scoring is the most recently *parsed* one
+  // (mirrors MatchingFacade / findFirstBySeekerIdAndProcessingStatusOrder...),
+  // not just the most recently uploaded row.
+  const latestParsedResume = useMemo(() => {
+    const parsedItems = (history?.items ?? []).filter((item) => item.status === "PARSED");
+    if (parsedItems.length === 0) return null;
+    return parsedItems.reduce((latest, item) => {
+      const latestTime = latest.parsedAt ? new Date(latest.parsedAt).getTime() : 0;
+      const itemTime = item.parsedAt ? new Date(item.parsedAt).getTime() : 0;
+      return itemTime > latestTime ? item : latest;
+    });
+  }, [history]);
 
   const handleUpload = async (e: FormEvent) => {
     e.preventDefault();
@@ -615,6 +654,41 @@ export default function SeekerDashboard() {
           )}
         </Card>
       </div>
+
+      {/* Skills from resume */}
+      {latestParsedResume && (
+        <Card style={{ marginBottom: "1.5rem" }}>
+          <div style={{ marginBottom: "1rem" }}>
+            <h3 style={{ marginBottom: "0.25rem" }}>Skills from your resume</h3>
+            <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+              Detected from {latestParsedResume.originalFilename}. These drive your skills-overlap score on job matches.
+            </p>
+          </div>
+          {latestParsedResume.inferredSkills.length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+              {latestParsedResume.inferredSkills.map((skill) => (
+                <span
+                  key={skill}
+                  style={{
+                    padding: "0.25rem 0.625rem",
+                    background: "var(--accent-faint)",
+                    color: "var(--accent)",
+                    borderRadius: "999px",
+                    fontSize: "0.8125rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>
+              No specific skills were detected. Try a resume with more explicit technology or tool names.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Bottom row: Profile */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
