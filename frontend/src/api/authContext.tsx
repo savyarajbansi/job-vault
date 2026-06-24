@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import {
   getAccessToken,
   login as apiLogin,
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken());
   const [isSessionReady, setIsSessionReady] = useState(!getAccessToken());
   const [user, setUser] = useState<AuthUser | null>(null);
+  const location = useLocation();
+  const lastKnownTokenRef = useRef<string | null>(getAccessToken());
 
   const hydrateSession = useCallback(async () => {
     const accessToken = getAccessToken();
@@ -76,8 +79,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void hydrateSession();
   }, [hydrateSession]);
 
+  // Re-check auth state on every same-tab navigation. The underlying access
+  // token can change without going through this context's own login()/
+  // logout() calls — most commonly a background silent-refresh failing
+  // (auth.ts: markRefreshFailure()) — which previously left the nav bar
+  // showing a stale signed-in/signed-out state until a full reload or a
+  // cross-tab storage event.
+  useEffect(() => {
+    const currentToken = getAccessToken();
+    if (currentToken === lastKnownTokenRef.current) {
+      return;
+    }
+    lastKnownTokenRef.current = currentToken;
+
+    if (!currentToken) {
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsSessionReady(true);
+      return;
+    }
+
+    void hydrateSession();
+  }, [location.pathname, hydrateSession]);
+
   const login = useCallback(async (email: string, password: string) => {
     const result = await apiLogin(email, password);
+    lastKnownTokenRef.current = getAccessToken();
     setIsAuthenticated(true);
     setIsSessionReady(true);
     setUser({
@@ -91,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiLogout().catch(() => null);
+    lastKnownTokenRef.current = getAccessToken();
     setIsAuthenticated(false);
     setUser(null);
     setIsSessionReady(true);
