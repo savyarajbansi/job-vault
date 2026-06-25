@@ -38,7 +38,8 @@ function conflictMessage(error: unknown): string {
   return "Could not update this application. Please try again.";
 }
 
-function laneLabel(status: "submitted" | "under-review" | "decided"): string {
+function laneLabel(status: "draft" | "submitted" | "under-review" | "decided"): string {
+  if (status === "draft") return "Draft (not yet submitted)";
   if (status === "submitted") return "Submitted";
   if (status === "under-review") return "Under review";
   return "Decided";
@@ -88,12 +89,13 @@ export default function ApplicationReview() {
   }, [jobId, refreshKey]);
 
   const lanes = useMemo(() => {
+    const draft = applications.filter((application) => application.status === "DRAFT");
     const submitted = applications.filter((application) => application.status === "SUBMITTED");
     const underReview = applications.filter((application) => application.status === "UNDER_REVIEW");
     const decided = applications.filter((application) =>
       application.status === "ACCEPTED" || application.status === "REJECTED" || application.status === "WITHDRAWN"
     );
-    return { submitted, underReview, decided };
+    return { draft, submitted, underReview, decided };
   }, [applications]);
 
   const changeStatus = async (applicationId: string, status: "UNDER_REVIEW" | "ACCEPTED" | "REJECTED") => {
@@ -138,8 +140,9 @@ export default function ApplicationReview() {
           <Spinner size={32} />
         </div>
       ) : error ? null : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
           {([
+            ["draft", lanes.draft],
             ["submitted", lanes.submitted],
             ["under-review", lanes.underReview],
             ["decided", lanes.decided],
@@ -177,18 +180,18 @@ export default function ApplicationReview() {
                           <span style={{ color: "var(--ink-muted)", fontSize: "0.75rem" }}>{formatDate(application.submittedAt)}</span>
                         </div>
 
-                        {application.status === "SUBMITTED" && (
+                        {laneId === "draft" ? (
+                          <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
+                            Saved by the candidate — not yet submitted.
+                          </p>
+                        ) : application.status === "SUBMITTED" ? (
                           <Button loading={busyId === application.id} variant="secondary" size="sm" onClick={() => void changeStatus(application.id, "UNDER_REVIEW")}>Move to Under Review</Button>
-                        )}
-
-                        {application.status === "UNDER_REVIEW" && (
+                        ) : application.status === "UNDER_REVIEW" ? (
                           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                             <Button loading={busyId === application.id} size="sm" onClick={() => void changeStatus(application.id, "ACCEPTED")}>Accept</Button>
                             <Button loading={busyId === application.id} size="sm" variant="secondary" onClick={() => void changeStatus(application.id, "REJECTED")}>Reject</Button>
                           </div>
-                        )}
-
-                        {application.status !== "SUBMITTED" && application.status !== "UNDER_REVIEW" && (
+                        ) : (
                           <div style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
                             {application.status === "ACCEPTED" ? "Accepted" : application.status === "REJECTED" ? "Rejected" : "Withdrawn"} on {formatDate(application.decidedAt ?? application.reviewedAt)}
                           </div>

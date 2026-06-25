@@ -1,18 +1,53 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   getSeekerMatches,
   getSeekerSkillGaps,
+  getMyApplications,
+  applyToJob,
+  draftApplication,
+  withdrawApplication,
   SeekerJobMatchResponse,
   SeekerMatchItem,
+  SeekerApplicationItem,
 } from "../api/seeker";
-import { formatSalaryRange, EDUCATION_LABELS } from "../api/employer";
+import { formatSalaryRange, EDUCATION_LABELS, ApplicationStatus } from "../api/employer";
+import { ApiResponseError } from "../api/client";
 import { Button, Alert, Card, Badge, Spinner, ScoreBar } from "../components/ui";
 
 function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
   if (score >= 0.4) return "#B07D20";
   return "var(--ink-muted)";
- }
+}
+
+function applicationBadgeTone(status: ApplicationStatus): "neutral" | "success" | "warn" | "accent" {
+  if (status === "ACCEPTED") return "success";
+  if (status === "REJECTED" || status === "WITHDRAWN") return "warn";
+  if (status === "SUBMITTED" || status === "UNDER_REVIEW") return "accent";
+  return "neutral"; // DRAFT
+}
+
+function applicationStatusLabel(status: ApplicationStatus): string {
+  const map: Record<ApplicationStatus, string> = {
+    DRAFT: "Draft saved",
+    SUBMITTED: "Applied",
+    UNDER_REVIEW: "Under review",
+    ACCEPTED: "Accepted",
+    REJECTED: "Not selected",
+    WITHDRAWN: "Withdrawn",
+  };
+  return map[status];
+}
+
+function describeApplicationActionError(error: unknown): string {
+  if (error instanceof Error && error.message.includes("ERR_AUTH_003")) {
+    return "Your session has ended. Please sign in again.";
+  }
+  if (error instanceof ApiResponseError && error.response.status === 409) {
+    return "This application has already moved on — refreshing the latest status.";
+  }
+  return "That action didn't go through. Please try again.";
+}
 
 export default function SeekerMatches() {
   const [matches, setMatches] = useState<SeekerJobMatchResponse | null>(null);
@@ -25,6 +60,27 @@ export default function SeekerMatches() {
   const [gaps, setGaps] = useState<string[] | null>(null);
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
+
+  const [applicationsByJobId, setApplicationsByJobId] = useState<Record<string, SeekerApplicationItem>>({});
+  const [applicationActionState, setApplicationActionState] = useState<
+    "idle" | "drafting" | "applying" | "withdrawing"
+  >("idle");
+  const [applicationActionError, setApplicationActionError] = useState<string | null>(null);
+
+  const loadApplications = useCallback(async () => {
+    try {
+      const items = await getMyApplications();
+      const byJobId: Record<string, SeekerApplicationItem> = {};
+      for (const item of items) {
+        if (item.jobId) {
+          byJobId[item.jobId] = item;
+        }
+      }
+      setApplicationsByJobId(byJobId);
+    } catch {
+      // Non-fatal — matches still render without application status.
+    }
+  }, []);
 
   const loadMatches = async (offset: number) => {
     setLoading(true);
@@ -68,7 +124,12 @@ export default function SeekerMatches() {
   }, [page]);
 
   useEffect(() => {
+    void loadApplications();
+  }, [loadApplications]);
+
+  useEffect(() => {
     if (selected) void loadGaps(selected.jobId);
+    setApplicationActionError(null);
   }, [selected]);
 
   const total = matches?.page.total ?? 0;
@@ -76,6 +137,30 @@ export default function SeekerMatches() {
   const selectedSalaryLabel = selected
     ? formatSalaryRange(selected.job.salaryMin, selected.job.salaryMax)
     : null;
+  const selectedApplication = selected ? applicationsByJobId[selected.jobId] : undefined;
+
+  const runApplicationAction = async (action: "draft" | "apply" | "withdraw") => {
+    if (!selected) return;
+    setApplicationActionError(null);
+    setApplicationActionState(
+      action === "draft" ? "drafting" : action === "apply" ? "applying" : "withdrawing"
+    );
+    try {
+      if (action === "draft") {
+        await draftApplication(selected.jobId);
+      } else if (action === "apply") {
+        await applyToJob(selected.jobId);
+      } else if (selectedApplication) {
+        await withdrawApplication(selectedApplication.id);
+      }
+      await loadApplications();
+    } catch (err) {
+      setApplicationActionError(describeApplicationActionError(err));
+      await loadApplications();
+    } finally {
+      setApplicationActionState("idle");
+    }
+  };
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
@@ -107,6 +192,7 @@ export default function SeekerMatches() {
             {matches.items.map((item, idx) => {
               const isSelected = selected?.jobId === item.jobId;
               const salaryLabel = formatSalaryRange(item.job.salaryMin, item.job.salaryMax);
+              const existingApplication = applicationsByJobId[item.jobId];
               return (
                 <button
                   key={item.jobId}
@@ -137,6 +223,11 @@ export default function SeekerMatches() {
                         </div>
                       )}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                        {existingApplication && (
+                          <Badge tone={applicationBadgeTone(existingApplication.status)}>
+                            {applicationStatusLabel(existingApplication.status)}
+                          </Badge>
+                        )}
                         {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
                         {item.job.remoteEligible && (
                           <Badge tone="accent">Remote eligible</Badge>
@@ -238,6 +329,101 @@ export default function SeekerMatches() {
                     </span>
                     <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>overall fit</span>
                   </div>
+                </div>
+
+                {/* ── Application actions ── */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.625rem",
+                    padding: "0.875rem",
+                    background: "var(--bg-subtle)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  {applicationActionError && <Alert tone="error">{applicationActionError}</Alert>}
+
+                  {!selectedApplication && (
+                    <>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                        You haven't applied to this job yet.
+                      </p>
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <Button
+                          size="sm"
+                          loading={applicationActionState === "applying"}
+                          disabled={applicationActionState !== "idle"}
+                          onClick={() => void runApplicationAction("apply")}
+                        >
+                          Apply now
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={applicationActionState === "drafting"}
+                          disabled={applicationActionState !== "idle"}
+                          onClick={() => void runApplicationAction("draft")}
+                        >
+                          Save as draft
+                        </Button>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedApplication && selectedApplication.status === "DRAFT" && (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Badge tone="neutral">Draft saved</Badge>
+                        <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                          Not yet submitted to the employer.
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        loading={applicationActionState === "applying"}
+                        disabled={applicationActionState !== "idle"}
+                        onClick={() => void runApplicationAction("apply")}
+                      >
+                        Submit application
+                      </Button>
+                    </>
+                  )}
+
+                  {selectedApplication &&
+                    (selectedApplication.status === "SUBMITTED" ||
+                      selectedApplication.status === "UNDER_REVIEW") && (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <Badge tone={applicationBadgeTone(selectedApplication.status)}>
+                            {applicationStatusLabel(selectedApplication.status)}
+                          </Badge>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={applicationActionState === "withdrawing"}
+                          disabled={applicationActionState !== "idle"}
+                          onClick={() => void runApplicationAction("withdraw")}
+                        >
+                          Withdraw application
+                        </Button>
+                      </>
+                    )}
+
+                  {selectedApplication &&
+                    (selectedApplication.status === "ACCEPTED" ||
+                      selectedApplication.status === "REJECTED" ||
+                      selectedApplication.status === "WITHDRAWN") && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Badge tone={applicationBadgeTone(selectedApplication.status)}>
+                          {applicationStatusLabel(selectedApplication.status)}
+                        </Badge>
+                        <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                          This application is closed.
+                        </span>
+                      </div>
+                    )}
                 </div>
 
                 {/* Score breakdown */}

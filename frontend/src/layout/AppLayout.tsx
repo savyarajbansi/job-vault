@@ -377,6 +377,9 @@ export default function AppLayout() {
                     <NavLink to="/seeker/matches" className="nav-link">
                       Matches
                     </NavLink>
+                    <NavLink to="/seeker/applications" className="nav-link">
+                      Applications
+                    </NavLink>
                   </>
                 )}
 

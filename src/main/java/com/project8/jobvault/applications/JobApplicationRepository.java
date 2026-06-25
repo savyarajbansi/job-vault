@@ -17,6 +17,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     Optional<JobApplication> findByIdAndSeekerId(UUID id, UUID seekerId);
 
+    List<JobApplication> findAllBySeekerIdOrderByCreatedAtDesc(UUID seekerId);
+
     List<JobApplication> findAllByJobIdAndJobEmployerIdOrderBySubmittedAtDesc(UUID jobId, UUID employerId);
 
     @Transactional

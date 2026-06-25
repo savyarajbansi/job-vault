@@ -6,6 +6,7 @@ import Home from "./routes/Home";
 import AuthPage from "./routes/AuthPage";
 import SeekerDashboard from "./routes/SeekerDashboard";
 import SeekerMatches from "./routes/SeekerMatches";
+import SeekerApplications from "./routes/SeekerApplications";
 import EmployerDashboard from "./routes/EmployerDashboard";
 import JobEditor from "./routes/JobEditor";
 import CandidateMatches from "./routes/CandidateMatches";
@@ -75,6 +76,14 @@ export default function App() {
           element={
             <RequireRole role="JOB_SEEKER" fallback="/employer">
               <SeekerMatches />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="seeker/applications"
+          element={
+            <RequireRole role="JOB_SEEKER" fallback="/employer">
+              <SeekerApplications />
             </RequireRole>
           }
         />

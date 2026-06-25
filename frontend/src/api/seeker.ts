@@ -1,5 +1,5 @@
 import { authorizedRequest } from "./auth";
-import { EducationRequirement } from "./employer";
+import { ApplicationStatus, EducationRequirement } from "./employer";
 
 export type ResumeUploadResult = {
   resumeId: string;
@@ -144,4 +144,55 @@ export async function updateSeekerProfile(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+}
+
+// ── Applications ────────────────────────────────────────────────────────────
+// Mirrors JobApplicationResponse.java — returned by draft/apply/withdraw.
+export type ApplicationActionResult = {
+  id: string;
+  jobId: string;
+  seekerId: string;
+  status: ApplicationStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  decidedAt: string | null;
+};
+
+// Mirrors SeekerApplicationResponse.java — returned by the list endpoint.
+export type SeekerApplicationItem = {
+  id: string;
+  jobId: string | null;
+  jobTitle: string | null;
+  companyName: string | null;
+  status: ApplicationStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  decidedAt: string | null;
+};
+
+export async function draftApplication(jobId: string): Promise<ApplicationActionResult> {
+  return authorizedRequest<ApplicationActionResult>(`/api/seeker/jobs/${jobId}/draft`, {
+    method: "POST",
+  });
+}
+
+export async function applyToJob(jobId: string): Promise<ApplicationActionResult> {
+  return authorizedRequest<ApplicationActionResult>(`/api/seeker/jobs/${jobId}/apply`, {
+    method: "POST",
+  });
+}
+
+export async function getMyApplications(): Promise<SeekerApplicationItem[]> {
+  return authorizedRequest<SeekerApplicationItem[]>("/api/seeker/applications", {
+    method: "GET",
+  });
+}
+
+export async function withdrawApplication(
+  applicationId: string
+): Promise<ApplicationActionResult> {
+  return authorizedRequest<ApplicationActionResult>(
+    `/api/seeker/applications/${applicationId}/withdraw`,
+    { method: "PATCH" }
+  );
 }

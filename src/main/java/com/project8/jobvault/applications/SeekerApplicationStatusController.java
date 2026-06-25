@@ -5,6 +5,7 @@ import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import java.time.Clock;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +35,15 @@ public class SeekerApplicationStatusController {
         this.jobApplicationRepository = jobApplicationRepository;
         this.userAccountRepository = userAccountRepository;
         this.clock = clock;
+    }
+
+    @GetMapping
+    @Transactional(readOnly = true)
+    public List<SeekerApplicationResponse> listMine(@AuthenticationPrincipal JwtPrincipal principal) {
+        UserAccount seeker = requireUser(principal);
+        return jobApplicationRepository.findAllBySeekerIdOrderByCreatedAtDesc(seeker.getId()).stream()
+                .map(this::toSeekerResponse)
+                .toList();
     }
 
     @PatchMapping("/{applicationId}/withdraw")
@@ -89,6 +101,19 @@ public class SeekerApplicationStatusController {
                 application.getId(),
                 jobId,
                 seekerId,
+                application.getStatus(),
+                application.getSubmittedAt(),
+                application.getReviewedAt(),
+                application.getDecidedAt());
+    }
+
+    private SeekerApplicationResponse toSeekerResponse(JobApplication application) {
+        Job job = application.getJob();
+        return new SeekerApplicationResponse(
+                application.getId(),
+                job == null ? null : job.getId(),
+                job == null ? null : job.getTitle(),
+                job == null ? null : job.getCompanyName(),
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),
