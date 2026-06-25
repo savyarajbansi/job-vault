@@ -57,36 +57,41 @@ function NotificationBell() {
     };
   }, [isAuthenticated, isSessionReady]);
 
-  useEffect(() => {
-    if (!open || !isAuthenticated || !isSessionReady) {
-      return;
-    }
+useEffect(() => {
+  if (!isAuthenticated || !isSessionReady) {
+    setCount(null);
+    setItems([]);
+    return;
+  }
 
-    let cancelled = false;
-    const loadItems = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await getNotifications();
-        if (!cancelled) {
-          setItems(response);
-        }
-      } catch {
-        if (!cancelled) {
-          setError("Could not load notifications.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+  let cancelled = false;
+
+  const loadCount = async () => {
+    try {
+      const response = await getUnreadNotificationCount();
+      if (!cancelled) {
+        setCount(response.unreadCount);
       }
-    };
+    } catch {
+      if (!cancelled) {
+        setCount(null);
+      }
+    }
+  };
 
-    void loadItems();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, isAuthenticated, isSessionReady]);
+  void loadCount();
+
+  // Poll every 60 seconds. The bell panel also refreshes items on open,
+  // this just keeps the badge count from going stale during long sessions.
+  const intervalId = setInterval(() => {
+    void loadCount();
+  }, 60_000);
+
+  return () => {
+    cancelled = true;
+    clearInterval(intervalId);
+  };
+}, [isAuthenticated, isSessionReady]);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {

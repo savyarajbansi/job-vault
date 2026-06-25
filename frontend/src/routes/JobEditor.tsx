@@ -546,7 +546,36 @@ export default function JobEditor({ mode }: Props) {
               </Button>
             </div>
           </form>
-
+          {/* ── Inferred skills (read-only, post-save) ── */}
+          {!isCreate && job && job.requiredSkills.length > 0 && (
+            <>
+              <Divider label="Detected skills" />
+              <div style={{ marginTop: "1rem" }}>
+                <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginBottom: "0.75rem" }}>
+                  These skills were automatically detected from the job description.
+                  They drive the skills-overlap component (30%) of candidate match scores.
+                  Updating the description and saving will re-sync them.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                  {job.requiredSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      style={{
+                        padding: "0.25rem 0.625rem",
+                        background: "var(--accent-faint)",
+                        color: "var(--accent)",
+                        borderRadius: "999px",
+                        fontSize: "0.8125rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
           {!isCreate && (
             <>
               <Divider label="Status actions" />
