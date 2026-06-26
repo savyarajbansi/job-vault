@@ -71,6 +71,7 @@ export type MatchFactorBreakdown = {
 export type CandidateMatchItem = {
   resumeId: string;
   seekerId: string;
+  seekerName: string | null;
   score: number;
   factors: MatchFactorBreakdown;
   missingSkills: string[];
@@ -103,6 +104,7 @@ export type JobApplication = {
   id: string;
   jobId: string;
   seekerId: string;
+  seekerName: string | null;
   status: ApplicationStatus;
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -186,6 +188,21 @@ export async function reactivateEmployerJob(jobId: string): Promise<JobDetail> {
   return authorizedRequest<JobDetail>(`/api/employer/jobs/${jobId}/reactivate`, {
     method: "POST",
   });
+}
+
+export async function addEmployerJobSkill(jobId: string, name: string): Promise<JobDetail> {
+  return authorizedRequest<JobDetail>(`/api/employer/jobs/${jobId}/skills`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function removeEmployerJobSkill(jobId: string, skillName: string): Promise<JobDetail> {
+  return authorizedRequest<JobDetail>(
+    `/api/employer/jobs/${jobId}/skills/${encodeURIComponent(skillName)}`,
+    { method: "DELETE" }
+  );
 }
 
 export async function getEmployerCandidateMatches(

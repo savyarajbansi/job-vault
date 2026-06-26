@@ -3,16 +3,18 @@ import { useLocation } from "react-router-dom";
 import {
   getAccessToken,
   login as apiLogin,
+  register as apiRegister,
   logout as apiLogout,
   whoami,
   AuthTokensResponse,
   AuthUser as AuthPrincipalSummary,
+  RegisterRole,
 } from "./auth";
 
 type AuthUser = {
-  displayName?: string | null;
-  email?: string | null;
-  id?: string | null;
+  displayName: string | null;
+  email: string | null;
+  id: string | null;
   roles: string[];
 };
 
@@ -22,12 +24,27 @@ type AuthContextValue = {
   roles: string[];
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthTokensResponse>;
+  register: (
+    email: string,
+    password: string,
+    displayName: string,
+    role: RegisterRole
+  ) => Promise<AuthTokensResponse>;
   logout: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   refreshAuth: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function toAuthUser(profile: AuthPrincipalSummary): AuthUser {
+  return {
+    id: profile.id,
+    roles: profile.roles,
+    email: profile.email,
+    displayName: profile.displayName,
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken());
@@ -47,13 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setIsSessionReady(false);
     try {
-      const profile: AuthPrincipalSummary = await whoami();
+      const profile = await whoami();
       setIsAuthenticated(true);
-      setUser((current) =>
-        current
-          ? { ...current, roles: profile.roles, id: profile.id }
-          : { roles: profile.roles, id: profile.id }
-      );
+      setUser(toAuthUser(profile));
     } catch {
       setIsAuthenticated(false);
       setUser(null);
@@ -107,14 +120,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastKnownTokenRef.current = getAccessToken();
     setIsAuthenticated(true);
     setIsSessionReady(true);
-    setUser({
-      id: result.user.id,
-      roles: result.user.roles,
-      email,
-      displayName: null,
-    });
+    setUser(toAuthUser(result.user));
     return result;
   }, []);
+
+  const register = useCallback(
+    async (email: string, password: string, displayName: string, role: RegisterRole) => {
+      const result = await apiRegister(email, password, displayName, role);
+      lastKnownTokenRef.current = getAccessToken();
+      setIsAuthenticated(true);
+      setIsSessionReady(true);
+      setUser(toAuthUser(result.user));
+      return result;
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
     await apiLogout().catch(() => null);
@@ -132,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         roles: user?.roles ?? [],
         user,
         login,
+        register,
         logout,
         setUser,
         refreshAuth,

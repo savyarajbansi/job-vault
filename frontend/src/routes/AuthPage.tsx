@@ -1,8 +1,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../api/authContext";
-import { ApiResponseError, request } from "../api/client";
-import { AuthTokensResponse } from "../api/auth";
+import { ApiResponseError } from "../api/client";
 import { Button, Input, Alert, Card, Spinner } from "../components/ui";
 
 type Tab = "signin" | "register";
@@ -42,23 +41,9 @@ function parseFieldErrors(payload: unknown): FieldErrors {
   return { general: msg };
 }
 
-async function registerUser(
-  email: string,
-  password: string,
-  displayName: string,
-  role: Role
-): Promise<AuthTokensResponse> {
-  return request<AuthTokensResponse>("/api/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ email, password, displayName, role }),
-  });
-}
-
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { login, setUser, isAuthenticated, isSessionReady, roles } = useAuth();
+  const { login, register, isAuthenticated, isSessionReady, roles } = useAuth();
   const [tab, setTab] = useState<Tab>("signin");
 
   useEffect(() => {
@@ -90,12 +75,6 @@ export default function AuthPage() {
     setSiLoading(true);
     try {
       const result = await login(siEmail, siPassword);
-      setUser({
-        id: result.user.id,
-        email: siEmail,
-        displayName: null,
-        roles: result.user.roles,
-      });
       navigate(result.user.roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
@@ -119,14 +98,7 @@ export default function AuthPage() {
     }
     setRegLoading(true);
     try {
-      await registerUser(regEmail, regPassword, regDisplay, regRole);
-      const result = await login(regEmail, regPassword);
-      setUser({
-        id: result.user.id,
-        email: regEmail,
-        displayName: regDisplay || null,
-        roles: result.user.roles,
-      });
+      const result = await register(regEmail, regPassword, regDisplay, regRole);
       navigate(result.user.roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
     } catch (err) {
       const payload = err instanceof ApiResponseError ? err.payload : undefined;

@@ -3,11 +3,11 @@ package com.project8.jobvault.jobs;
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.matching.CorpusIdfService;
 import com.project8.jobvault.skills.Skill;
+import com.project8.jobvault.skills.SkillRepository;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +33,7 @@ public class EmployerJobController {
     private final JobRepository jobRepository;
     private final UserAccountRepository userAccountRepository;
     private final ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider;
+    private final ObjectProvider<SkillRepository> skillRepositoryProvider;
     private final CorpusIdfService corpusIdfService;
     private final Clock clock;
 
@@ -39,11 +41,13 @@ public class EmployerJobController {
             JobRepository jobRepository,
             UserAccountRepository userAccountRepository,
             ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider,
+            ObjectProvider<SkillRepository> skillRepositoryProvider,
             CorpusIdfService corpusIdfService,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
         this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
+        this.skillRepositoryProvider = skillRepositoryProvider;
         this.corpusIdfService = corpusIdfService;
         this.clock = clock;
     }
@@ -75,8 +79,12 @@ public class EmployerJobController {
         job.setEducationRequirement(request.educationRequirement());
         job.setStatus(JobStatus.DRAFT);
         Job saved = jobRepository.save(job);
+        // Populate auto-detected skills immediately so a brand-new job isn't
+        // sitting with an empty skill set until the employer happens to save again.
+        syncRequiredSkills(saved);
         refreshIdfCorpus();
-        return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(saved));
+        Job withSkills = jobRepository.findById(saved.getId()).orElse(saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(withSkills));
     }
 
     @GetMapping("/{jobId}")
@@ -116,7 +124,8 @@ public class EmployerJobController {
         Job saved = jobRepository.save(job);
         syncRequiredSkills(saved);
         refreshIdfCorpus();
-        return ResponseEntity.ok(toDetail(saved));
+        Job withSkills = jobRepository.findById(saved.getId()).orElse(saved);
+        return ResponseEntity.ok(toDetail(withSkills));
     }
 
     @PostMapping("/{jobId}/publish")
@@ -132,7 +141,8 @@ public class EmployerJobController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
         refreshIdfCorpus();
-        return ResponseEntity.ok(toDetail(saved));
+        Job withSkills = findOwned(jobId, employer.getId()).orElse(saved);
+        return ResponseEntity.ok(toDetail(withSkills));
     }
 
     @PostMapping("/{jobId}/disable")
@@ -148,7 +158,8 @@ public class EmployerJobController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
         refreshIdfCorpus();
-        return ResponseEntity.ok(toDetail(saved));
+        Job withSkills = findOwned(jobId, employer.getId()).orElse(saved);
+        return ResponseEntity.ok(toDetail(withSkills));
     }
 
     @PostMapping("/{jobId}/reactivate")
@@ -166,7 +177,62 @@ public class EmployerJobController {
         return ResponseEntity.ok(toDetail(saved));
     }
 
+    @PostMapping("/{jobId}/skills")
+    public ResponseEntity<JobDetailResponse> addRequiredSkill(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable UUID jobId,
+            @Valid @RequestBody JobSkillRequest request) {
+        UserAccount employer = requireUser(principal);
+        Objects.requireNonNull(request, "request");
+        Job job = requireEditableOwnedJob(jobId, employer.getId());
+        String normalized = request.name().trim();
+        if (normalized.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Skill name is required");
+        }
+        SkillRepository skillRepository = requireSkillRepository();
+        Skill skill = skillRepository.findByNameIgnoreCase(normalized)
+                .orElseGet(() -> {
+                    Skill created = new Skill();
+                    created.setName(normalized);
+                    return skillRepository.save(created);
+                });
+        job.getRequiredSkills().add(skill);
+        Job saved = jobRepository.save(job);
+        return ResponseEntity.ok(toDetail(saved));
+    }
+
+    @DeleteMapping("/{jobId}/skills/{skillName}")
+    public ResponseEntity<JobDetailResponse> removeRequiredSkill(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable UUID jobId,
+            @PathVariable String skillName) {
+        UserAccount employer = requireUser(principal);
+        Job job = requireEditableOwnedJob(jobId, employer.getId());
+        String normalized = skillName == null ? "" : skillName.trim();
+        job.getRequiredSkills().removeIf(skill ->
+                skill.getName() != null && skill.getName().equalsIgnoreCase(normalized));
+        Job saved = jobRepository.save(job);
+        return ResponseEntity.ok(toDetail(saved));
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    private Job requireEditableOwnedJob(UUID jobId, UUID employerId) {
+        Job job = findOwned(jobId, employerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        if (job.getStatus() == JobStatus.DISABLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job is disabled");
+        }
+        return job;
+    }
+
+    private SkillRepository requireSkillRepository() {
+        SkillRepository repository = skillRepositoryProvider.getIfAvailable();
+        if (repository == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Skill catalog unavailable");
+        }
+        return repository;
+    }
 
     private void throwNotFoundOrConflict(UUID jobId, UUID employerId, String conflictReason) {
         UUID resolvedJobId = Objects.requireNonNull(jobId, "jobId");

@@ -16,6 +16,12 @@ export type ResumeHistoryItem = {
   inferredSkills: string[];
 };
 
+export type MatchPage = {
+  limit: number;
+  offset: number;
+  total: number;
+};
+
 export type ResumeHistoryResponse = {
   items: ResumeHistoryItem[];
   page: MatchPage;
@@ -28,19 +34,13 @@ export type MatchFactors = {
   location: number;
 };
 
-export type MatchPage = {
-  limit: number;
-  offset: number;
-  total: number;
-};
-
-// Mirrors SeekerJobMatchResponse.JobInfo on the backend — keep in sync with
+// Mirrors SeekerJobMatchResponse.JobInfo on the backend. Keep in sync with
 // MatchingFacade#toJobInfo and SeekerJobMatchResponse.java.
 export type JobInfo = {
   title: string;
   companyName: string | null;
   location: string | null;
-  remoteEligible: boolean;
+  remoteEligible: boolean | null;
   salaryMin: number | null;
   salaryMax: number | null;
   educationRequirement: EducationRequirement | null;
@@ -90,6 +90,16 @@ export type SeekerProfileUpdate = {
   yearsExperience?: number | null;
 };
 
+function queryString(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    query.set(key, String(value));
+  }
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
 export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult> {
   const formData = new FormData();
   formData.set("file", file);
@@ -102,12 +112,8 @@ export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult
 export async function getSeekerResumeHistory(
   params: SeekerResumeHistoryQuery
 ): Promise<ResumeHistoryResponse> {
-  const query = new URLSearchParams({
-    limit: String(params.limit),
-    offset: String(params.offset),
-  });
   return authorizedRequest<ResumeHistoryResponse>(
-    `/api/seeker/resumes?${query.toString()}`,
+    `/api/seeker/resumes${queryString(params)}`,
     { method: "GET" }
   );
 }
@@ -115,12 +121,8 @@ export async function getSeekerResumeHistory(
 export async function getSeekerMatches(
   params: SeekerMatchesQuery
 ): Promise<SeekerJobMatchResponse> {
-  const query = new URLSearchParams({
-    limit: String(params.limit),
-    offset: String(params.offset),
-  });
   return authorizedRequest<SeekerJobMatchResponse>(
-    `/api/seeker/matches/jobs?${query.toString()}`,
+    `/api/seeker/matches/jobs${queryString(params)}`,
     { method: "GET" }
   );
 }
@@ -131,6 +133,8 @@ export async function getSeekerSkillGaps(jobId: string): Promise<SkillGapRespons
     { method: "GET" }
   );
 }
+
+export const getSeekerSkillGap = getSeekerSkillGaps;
 
 export async function getSeekerProfile(): Promise<SeekerProfile> {
   return authorizedRequest<SeekerProfile>("/api/seeker/profile", { method: "GET" });
@@ -146,19 +150,21 @@ export async function updateSeekerProfile(
   });
 }
 
-// ── Applications ────────────────────────────────────────────────────────────
-// Mirrors JobApplicationResponse.java — returned by draft/apply/withdraw.
+// Applications
+
+// Mirrors JobApplicationResponse.java - returned by draft/apply/withdraw.
 export type ApplicationActionResult = {
   id: string;
   jobId: string;
   seekerId: string;
+  seekerName: string | null;
   status: ApplicationStatus;
   submittedAt: string | null;
   reviewedAt: string | null;
   decidedAt: string | null;
 };
 
-// Mirrors SeekerApplicationResponse.java — returned by the list endpoint.
+// Mirrors SeekerApplicationResponse.java - returned by the list endpoint.
 export type SeekerApplicationItem = {
   id: string;
   jobId: string | null;

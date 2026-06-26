@@ -8,6 +8,7 @@ import com.project8.jobvault.resumes.ResumeMetadataRepository;
 import com.project8.jobvault.resumes.ResumeProcessingStatus;
 import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.users.UserAccount;
+import com.project8.jobvault.users.UserDisplayNames;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -127,6 +128,7 @@ public class MatchingFacade {
                     items.add(new EmployerCandidateMatchResponse.EmployerCandidateMatchItem(
                             item.resume.getId(),
                             seekerId,
+                            UserDisplayNames.nameOrEmail(seekerAccount),
                             item.breakdown.overallScore(),
                             item.breakdown.factors(),
                             item.breakdown.missingSkills()));

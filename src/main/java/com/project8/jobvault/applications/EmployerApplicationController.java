@@ -7,6 +7,7 @@ import com.project8.jobvault.notifications.NotificationService;
 import com.project8.jobvault.notifications.NotificationType;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.users.UserDisplayNames;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
@@ -60,9 +61,6 @@ public class EmployerApplicationController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount employer = requireUser(principal);
-        // Verify the job exists and belongs to this employer before returning applications.
-        // Returns 404 rather than an empty list when the job is missing or owned by someone else,
-        // so the caller can distinguish "no applications yet" from "job not found".
         boolean jobOwnedByEmployer = jobRepository.findById(jobId)
                 .filter(job -> job.getEmployer() != null)
                 .filter(job -> employer.getId().equals(job.getEmployer().getId()))
@@ -152,6 +150,7 @@ public class EmployerApplicationController {
                 application.getId(),
                 jobId,
                 seekerId,
+                UserDisplayNames.nameOrEmail(seeker),
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),

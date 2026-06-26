@@ -7,6 +7,7 @@ public record JobApplicationResponse(
         UUID id,
         UUID jobId,
         UUID seekerId,
+        String seekerName,
         ApplicationStatus status,
         Instant submittedAt,
         Instant reviewedAt,

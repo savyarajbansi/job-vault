@@ -174,7 +174,7 @@ export default function ApplicationReview() {
                           <div>
                             <Badge tone={statusTone(application.status)}>{application.status}</Badge>
                             <p style={{ marginTop: "0.55rem", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
-                              Candidate {application.seekerId.slice(0, 8)}…
+                              {application.seekerName ?? `Candidate ${application.seekerId.slice(0, 8)}…`}
                             </p>
                           </div>
                           <span style={{ color: "var(--ink-muted)", fontSize: "0.75rem" }}>{formatDate(application.submittedAt)}</span>

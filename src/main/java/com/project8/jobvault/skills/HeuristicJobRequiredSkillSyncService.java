@@ -10,6 +10,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Detects skills mentioned in a job's description and adds them to the job's
+ * required-skills set.
+ *
+ * <p>This is intentionally additive-only: it never removes a skill, whether
+ * that skill was previously auto-detected or added manually by the employer
+ * (see {@code EmployerJobController#addRequiredSkill}). That makes it safe to
+ * run automatically on every save (create/update/publish/disable) without
+ * ever clobbering a manually curated list. Known trade-off: manually removing
+ * a skill that is still literally present in the description text will not
+ * "stick" past the next save, since detection re-derives from the current
+ * text every time.
+ */
 @Service
 @ConditionalOnBean(SkillRepository.class)
 public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyncService {
@@ -29,11 +42,22 @@ public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyn
     @Override
     @Transactional
     public void syncRequiredSkills(Job job) {
-        if (job == null || job.getDescription() == null || job.getDescription().isBlank()) {
+        if (job == null || job.getId() == null) {
             return;
         }
-        Set<Skill> required = new LinkedHashSet<>();
-        for (String inferred : skillCatalog.extractSkills(job.getDescription())) {
+        // Re-fetch within this service's own transaction rather than trusting the
+        // caller's entity state, so this works correctly regardless of which
+        // transaction (if any) the caller is in.
+        Job managed = jobRepository.findById(job.getId()).orElse(null);
+        if (managed == null || managed.getDescription() == null || managed.getDescription().isBlank()) {
+            return;
+        }
+        Set<Skill> required = managed.getRequiredSkills();
+        if (required == null) {
+            required = new LinkedHashSet<>();
+            managed.setRequiredSkills(required);
+        }
+        for (String inferred : skillCatalog.extractSkills(managed.getDescription())) {
             String normalized = inferred == null ? "" : inferred.trim();
             if (normalized.isEmpty()) {
                 continue;
@@ -46,7 +70,6 @@ public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyn
                     });
             required.add(skill);
         }
-        job.setRequiredSkills(required);
-        jobRepository.save(job);
+        jobRepository.save(managed);
     }
 }

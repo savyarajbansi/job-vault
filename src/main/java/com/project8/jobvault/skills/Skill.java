@@ -19,7 +19,7 @@ public class Skill {
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
-    protected Skill() {
+    public Skill() {
     }
 
     public UUID getId() {

@@ -4,6 +4,7 @@ import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.users.UserDisplayNames;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -101,6 +102,7 @@ public class SeekerApplicationStatusController {
                 application.getId(),
                 jobId,
                 seekerId,
+                UserDisplayNames.nameOrEmail(seeker),
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),

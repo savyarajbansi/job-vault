@@ -134,7 +134,8 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<AuthUserSummary> me(@AuthenticationPrincipal JwtPrincipal principal) {
-        return ResponseEntity.ok(toSummary(principal));
+        UserAccount user = requireUser(principal);
+        return ResponseEntity.ok(toSummary(user));
     }
 
     private AuthTokensResponse issueTokens(UserAccount user, HttpServletResponse response) {
@@ -148,12 +149,11 @@ public class AuthController {
         String csrfToken = tokenGenerator.generateUrlSafeToken(jwtProperties.getCsrfTokenBytes());
         cookieService.setRefreshTokenCookie(response, refreshToken.token(), refreshToken.expiresAt());
         cookieService.setCsrfTokenCookie(response, csrfToken, refreshToken.expiresAt());
-        AuthUserSummary userSummary = new AuthUserSummary(user.getId(), extractRoles(user));
         return new AuthTokensResponse(
                 accessToken.token(),
                 accessToken.expiresAt(),
                 refreshToken.expiresAt(),
-                userSummary);
+                toSummary(user));
     }
 
     private Set<String> extractRoles(UserAccount user) {
@@ -166,19 +166,8 @@ public class AuthController {
         return roles;
     }
 
-    private AuthUserSummary toSummary(JwtPrincipal principal) {
-        if (principal == null) {
-            throw new BadCredentialsException("Invalid authentication");
-        }
-        UUID userId = principal.userId();
-        if (userId == null) {
-            throw new BadCredentialsException("Invalid authentication");
-        }
-        Set<String> roles = new HashSet<>();
-        if (principal.roles() != null) {
-            roles.addAll(principal.roles());
-        }
-        return new AuthUserSummary(userId, roles);
+    private AuthUserSummary toSummary(UserAccount user) {
+        return new AuthUserSummary(user.getId(), user.getEmail(), user.getDisplayName(), extractRoles(user));
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {

@@ -1,6 +1,8 @@
 import { request, sendRequest, throwResponseError } from "./client";
 export type AuthUser = {
   id: string;
+  email: string;
+  displayName: string | null;
   roles: string[];
 };
 
@@ -10,6 +12,8 @@ export type AuthTokensResponse = {
   refreshTokenExpiresAt: string;
   user: AuthUser;
 };
+
+export type RegisterRole = "JOB_SEEKER" | "EMPLOYER";
 
 const ACCESS_TOKEN_KEY = "jobvault.accessToken";
 const CSRF_COOKIE = "csrf_token";
@@ -37,6 +41,22 @@ export async function login(email: string, password: string): Promise<AuthTokens
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({ email, password })
+  });
+  applyAuthTokens(result);
+  return result;
+}
+
+export async function register(
+  email: string,
+  password: string,
+  displayName: string,
+  role: RegisterRole
+): Promise<AuthTokensResponse> {
+  const result = await request<AuthTokensResponse>("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password, displayName, role })
   });
   applyAuthTokens(result);
   return result;
@@ -296,4 +316,3 @@ async function requestRefreshTokens(): Promise<AuthTokensResponse> {
 function authRecoveryError(): Error {
   return new Error(`${AUTH_RECOVERY_CODE}: ${AUTH_RECOVERY_MESSAGE}`);
 }
-

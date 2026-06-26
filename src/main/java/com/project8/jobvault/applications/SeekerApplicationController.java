@@ -8,6 +8,7 @@ import com.project8.jobvault.notifications.NotificationService;
 import com.project8.jobvault.notifications.NotificationType;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.users.UserDisplayNames;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
@@ -142,6 +143,7 @@ public class SeekerApplicationController {
                 application.getId(),
                 jobId,
                 seekerId,
+                UserDisplayNames.nameOrEmail(seeker),
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),
@@ -162,9 +164,6 @@ public class SeekerApplicationController {
     }
 
     private String displayNameOrEmail(UserAccount user) {
-        if (user.getDisplayName() != null && !user.getDisplayName().isBlank()) {
-            return user.getDisplayName();
-        }
-        return user.getEmail();
+        return UserDisplayNames.nameOrEmail(user);
     }
 }

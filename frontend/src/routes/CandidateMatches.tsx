@@ -10,12 +10,6 @@ import {
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, ScoreBar, Spinner } from "../components/ui";
 
-function scoreTone(score: number): "success" | "warn" | "neutral" {
-  if (score >= 0.7) return "success";
-  if (score >= 0.4) return "warn";
-  return "neutral";
-}
-
 function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
   if (score >= 0.4) return "#B07D20";
@@ -137,7 +131,7 @@ export default function CandidateMatches() {
                 </p>
               </Card>
             ) : (
-              items.map((item, index) => {
+              items.map((item) => {
                 const activeState = notificationState[item.seekerId] ?? "idle";
                 const isSelected = selected?.seekerId === item.seekerId;
                 return (
@@ -157,7 +151,9 @@ export default function CandidateMatches() {
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
-                          <h2 style={{ fontSize: "0.975rem", margin: 0 }}>Candidate {index + 1}</h2>
+                          <h2 style={{ fontSize: "0.975rem", margin: 0 }}>
+                            {item.seekerName ?? `Candidate ${truncateId(item.seekerId)}`}
+                          </h2>
                           <Badge tone={item.missingSkills.length === 0 ? "success" : "neutral"}>
                             {item.missingSkills.length === 0 ? "No gaps" : `${item.missingSkills.length} gaps`}
                           </Badge>
@@ -220,7 +216,12 @@ export default function CandidateMatches() {
               <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <div>
                   <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem", marginBottom: "0.35rem" }}>Selected candidate</p>
-                  <h2 style={{ marginBottom: "0.5rem" }}>Candidate {truncateId(selected.seekerId)}</h2>
+                  <h2 style={{ marginBottom: "0.25rem" }}>
+                    {selected.seekerName ?? `Candidate ${truncateId(selected.seekerId)}`}
+                  </h2>
+                  <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem", marginBottom: "0.5rem" }}>
+                    {truncateId(selected.seekerId)}
+                  </p>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0.75rem", borderRadius: "var(--radius-sm)", background: "var(--bg-subtle)" }}>
                     <span style={{ fontFamily: "var(--font-display)", fontSize: "1.6rem", fontWeight: 700, color: scoreColor(selected.score) }}>
                       {Math.round(selected.score * 100)}%

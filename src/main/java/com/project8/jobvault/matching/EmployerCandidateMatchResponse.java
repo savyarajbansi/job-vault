@@ -9,6 +9,7 @@ public record EmployerCandidateMatchResponse(
     public record EmployerCandidateMatchItem(
             UUID resumeId,
             UUID seekerId,
+            String seekerName,
             double score,
             MatchFactorBreakdown factors,
             List<String> missingSkills) {
