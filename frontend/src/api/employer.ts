@@ -215,6 +215,16 @@ export async function getEmployerCandidateMatches(
   );
 }
 
+/**
+ * Notifies a candidate of a strong match.
+ *
+ * `score` is passed in on the 0.0–1.0 scale used everywhere else in the
+ * frontend (CandidateMatchItem.score, the displayed percentage, etc.). The
+ * backend's CandidateMatchRequest / EmployerMatchController expects a 0–100
+ * scale and compares it against a 70.0 threshold, so it's rescaled here at
+ * the API boundary — every existing call site keeps passing its local
+ * 0.0–1.0 score unchanged.
+ */
 export async function notifyEmployerCandidate(
   jobId: string,
   seekerId: string,
@@ -225,7 +235,7 @@ export async function notifyEmployerCandidate(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seekerId, score }),
+      body: JSON.stringify({ seekerId, score: score * 100 }),
     }
   );
 }

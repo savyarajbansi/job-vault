@@ -30,6 +30,10 @@ function NotificationBell() {
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
+  // Load the unread count on mount and poll every 60 seconds while signed
+  // in. The bell panel also refreshes the full notification list whenever
+  // it's opened (see the effect below) — this just keeps the badge count
+  // from going stale during long sessions where the panel is never opened.
   useEffect(() => {
     if (!isAuthenticated || !isSessionReady) {
       setCount(null);
@@ -38,6 +42,7 @@ function NotificationBell() {
     }
 
     let cancelled = false;
+
     const loadCount = async () => {
       try {
         const response = await getUnreadNotificationCount();
@@ -52,46 +57,51 @@ function NotificationBell() {
     };
 
     void loadCount();
+
+    const intervalId = setInterval(() => {
+      void loadCount();
+    }, 60_000);
+
     return () => {
       cancelled = true;
+      clearInterval(intervalId);
     };
   }, [isAuthenticated, isSessionReady]);
 
-useEffect(() => {
-  if (!isAuthenticated || !isSessionReady) {
-    setCount(null);
-    setItems([]);
-    return;
-  }
-
-  let cancelled = false;
-
-  const loadCount = async () => {
-    try {
-      const response = await getUnreadNotificationCount();
-      if (!cancelled) {
-        setCount(response.unreadCount);
-      }
-    } catch {
-      if (!cancelled) {
-        setCount(null);
-      }
+  // Load the actual notification list whenever the panel is opened, so it
+  // shows real data instead of staying permanently empty.
+  useEffect(() => {
+    if (!open || !isAuthenticated || !isSessionReady) {
+      return;
     }
-  };
 
-  void loadCount();
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-  // Poll every 60 seconds. The bell panel also refreshes items on open,
-  // this just keeps the badge count from going stale during long sessions.
-  const intervalId = setInterval(() => {
-    void loadCount();
-  }, 60_000);
+    const loadNotifications = async () => {
+      try {
+        const response = await getNotifications();
+        if (!cancelled) {
+          setItems(response);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Could not load notifications.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
 
-  return () => {
-    cancelled = true;
-    clearInterval(intervalId);
-  };
-}, [isAuthenticated, isSessionReady]);
+    void loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isAuthenticated, isSessionReady]);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
