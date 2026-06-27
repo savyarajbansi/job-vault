@@ -5,9 +5,8 @@ import {
   getSeekerResumeHistory,
   getSeekerProfile,
   updateSeekerProfile,
-  ResumeHistoryResponse,
-  SeekerProfile,
 } from "../api/seeker";
+import type { ResumeHistoryResponse, SeekerProfile } from "../api/seeker";
 import { Button, Alert, Card, Badge, Spinner, Input } from "../components/ui";
 import { useAuth } from "../api/authContext";
 

@@ -3,17 +3,16 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   createEmployerJob,
   EDUCATION_LABELS,
-  EducationRequirement,
   getEmployerJob,
-  JobDetail,
-  JobStatus,
   publishEmployerJob,
   disableEmployerJob,
   reactivateEmployerJob,
   updateEmployerJob,
 } from "../api/employer";
+import type { EducationRequirement, JobDetail, JobStatus } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Divider, Input, Spinner } from "../components/ui";
+import JobSkillsEditor from "../components/JobSkillsEditor";
 
 type Props = {
   mode: "create" | "edit";
@@ -283,7 +282,12 @@ export default function JobEditor({ mode }: Props) {
           </p>
         </div>
         {!isCreate && job && (
-          <Badge tone={statusTone(job.status)}>{job.status}</Badge>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
+            <Badge tone={statusTone(job.status)}>{job.status}</Badge>
+            <Link to={`/jobs/${job.id}`} style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
+              View job page →
+            </Link>
+          </div>
         )}
       </div>
 
@@ -546,36 +550,17 @@ export default function JobEditor({ mode }: Props) {
               </Button>
             </div>
           </form>
-          {/* ── Inferred skills (read-only, post-save) ── */}
-          {!isCreate && job && job.requiredSkills.length > 0 && (
+
+          {/* ── Required skills (editable) ── */}
+          {!isCreate && job && (
             <>
-              <Divider label="Detected skills" />
+              <Divider label="Required skills" />
               <div style={{ marginTop: "1rem" }}>
-                <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginBottom: "0.75rem" }}>
-                  These skills were automatically detected from the job description.
-                  They drive the skills-overlap component (30%) of candidate match scores.
-                  Updating the description and saving will re-sync them.
-                </p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
-                  {job.requiredSkills.map((skill) => (
-                    <span
-                      key={skill}
-                      style={{
-                        padding: "0.25rem 0.625rem",
-                        background: "var(--accent-faint)",
-                        color: "var(--accent)",
-                        borderRadius: "999px",
-                        fontSize: "0.8125rem",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                <JobSkillsEditor job={job} onUpdate={applyJobToForm} />
               </div>
             </>
           )}
+
           {!isCreate && (
             <>
               <Divider label="Status actions" />

@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   getEmployerJob,
-  JobApplication,
-  JobDetail,
   listEmployerJobApplications,
   updateEmployerApplicationStatus,
 } from "../api/employer";
+import type { JobApplication, JobDetail } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
 

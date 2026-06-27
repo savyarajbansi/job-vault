@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   getSeekerMatches,
   getSeekerSkillGaps,
@@ -6,11 +7,14 @@ import {
   applyToJob,
   draftApplication,
   withdrawApplication,
+} from "../api/seeker";
+import type {
   SeekerJobMatchResponse,
   SeekerMatchItem,
   SeekerApplicationItem,
 } from "../api/seeker";
-import { formatSalaryRange, EDUCATION_LABELS, ApplicationStatus } from "../api/employer";
+import { formatSalaryRange, EDUCATION_LABELS } from "../api/employer";
+import type { ApplicationStatus } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Button, Alert, Card, Badge, Spinner, ScoreBar } from "../components/ui";
 
@@ -296,10 +300,16 @@ export default function SeekerMatches() {
                     {selected.job.title}
                   </div>
                   {selected.job.companyName && (
-                    <div style={{ fontSize: "0.875rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.625rem" }}>
+                    <div style={{ fontSize: "0.875rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.375rem" }}>
                       {selected.job.companyName}
                     </div>
                   )}
+                  <Link
+                    to={`/jobs/${selected.jobId}`}
+                    style={{ display: "inline-block", fontSize: "0.8125rem", fontWeight: 500, marginBottom: "0.625rem" }}
+                  >
+                    View full job posting →
+                  </Link>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.75rem" }}>
                     {selected.job.location && <Badge tone="neutral">{selected.job.location}</Badge>}
                     {selectedSalaryLabel && <Badge tone="neutral">{selectedSalaryLabel}</Badge>}
@@ -513,7 +523,7 @@ export default function SeekerMatches() {
                       fontWeight: 500,
                     }}
                   >
-                    🌐 Remote eligible
+                    Remote eligible
                   </div>
                 )}
               </Card>

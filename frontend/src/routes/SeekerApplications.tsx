@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getMyApplications, withdrawApplication, SeekerApplicationItem } from "../api/seeker";
-import { ApplicationStatus } from "../api/employer";
+import { getMyApplications, withdrawApplication } from "../api/seeker";
+import type { SeekerApplicationItem } from "../api/seeker";
+import type { ApplicationStatus } from "../api/employer";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
 
 function statusTone(status: ApplicationStatus): "neutral" | "success" | "warn" | "accent" {
@@ -112,9 +113,17 @@ export default function SeekerApplications() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
-                    <h2 style={{ fontSize: "1.0625rem", margin: 0 }}>
-                      {item.jobTitle ?? "Job no longer available"}
-                    </h2>
+                    {item.jobId ? (
+                      <Link to={`/jobs/${item.jobId}`} style={{ textDecoration: "none" }}>
+                        <h2 style={{ fontSize: "1.0625rem", margin: 0, color: "var(--ink)" }}>
+                          {item.jobTitle ?? "Job no longer available"}
+                        </h2>
+                      </Link>
+                    ) : (
+                      <h2 style={{ fontSize: "1.0625rem", margin: 0 }}>
+                        {item.jobTitle ?? "Job no longer available"}
+                      </h2>
+                    )}
                     <Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge>
                   </div>
                   {item.companyName && (

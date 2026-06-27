@@ -1,5 +1,5 @@
 import { authorizedRequest } from "./auth";
-import { ApplicationStatus, EducationRequirement } from "./employer";
+import type { ApplicationStatus, EducationRequirement } from "./employer";
 
 export type ResumeUploadResult = {
   resumeId: string;

@@ -4,6 +4,7 @@ import { useAuth } from "./api/authContext";
 import AppLayout from "./layout/AppLayout";
 import Home from "./routes/Home";
 import AuthPage from "./routes/AuthPage";
+import JobDetailPage from "./routes/JobDetail";
 import SeekerDashboard from "./routes/SeekerDashboard";
 import SeekerMatches from "./routes/SeekerMatches";
 import SeekerApplications from "./routes/SeekerApplications";
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Home />} />
         <Route path="auth" element={<AuthPage />} />
+        <Route path="jobs/:jobId" element={<JobDetailPage />} />
 
         {/* Seeker routes */}
         <Route

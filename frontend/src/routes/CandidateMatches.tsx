@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  CandidateMatchItem,
-  JobDetail,
   getEmployerCandidateMatches,
   getEmployerJob,
   notifyEmployerCandidate,
 } from "../api/employer";
+import type { CandidateMatchItem, JobDetail } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, ScoreBar, Spinner } from "../components/ui";
 

@@ -4,10 +4,9 @@ import {
   getSeekerMatches,
   getSeekerResumeHistory,
   getSeekerSkillGaps,
-  ResumeHistoryResponse,
-  SeekerJobMatchResponse,
   uploadSeekerResume
 } from "../api/seeker";
+import type { ResumeHistoryResponse, SeekerJobMatchResponse } from "../api/seeker";
 
 type Banner = {
   tone: "success" | "error";

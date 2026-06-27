@@ -5,12 +5,10 @@ import {
   formatSalaryRange,
   getEmployerJob,
   getEmployerJobs,
-  JobDetail,
-  JobStatus,
-  JobSummary,
   publishEmployerJob,
   reactivateEmployerJob,
 } from "../api/employer";
+import type { JobDetail, JobStatus, JobSummary } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
 
@@ -350,6 +348,12 @@ export default function EmployerDashboard() {
                       marginTop: "1rem",
                     }}
                   >
+                    <Link
+                      to={`/jobs/${job.id}`}
+                      style={{ color: "var(--accent)", fontSize: "0.875rem", fontWeight: 500 }}
+                    >
+                      View job page
+                    </Link>
                     <Link
                       to={`/employer/jobs/${job.id}`}
                       style={{ color: "var(--accent)", fontSize: "0.875rem", fontWeight: 500 }}
