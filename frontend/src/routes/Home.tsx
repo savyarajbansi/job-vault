@@ -88,6 +88,9 @@ export default function Home() {
             <Link to="/auth">
               <Button size="lg">Get started</Button>
             </Link>
+            <Link to="/jobs">
+              <Button variant="secondary" size="lg">Browse open roles</Button>
+            </Link>
             <Link to="/auth">
               <Button variant="ghost" size="lg">Sign in</Button>
             </Link>

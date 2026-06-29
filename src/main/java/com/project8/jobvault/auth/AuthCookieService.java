@@ -14,6 +14,15 @@ import jakarta.servlet.http.HttpServletResponse;
 public class AuthCookieService {
     public static final String CSRF_HEADER = "X-CSRF-Token";
 
+    // The CSRF cookie must stay readable via document.cookie from every SPA
+    // route (e.g. /seeker/matches), not just /api/auth/**. Cookie Path scopes
+    // document.cookie visibility to the *current page's* path, not just which
+    // outgoing requests carry the cookie -- scoping it the same as the refresh
+    // token cookie meant the frontend could never read it outside auth pages,
+    // so every refresh/logout call made while browsing elsewhere silently
+    // dropped the X-CSRF-Token header and failed with ERR_AUTH_003.
+    private static final String CSRF_COOKIE_PATH = "/";
+
     private final AuthCookieProperties properties;
     private final Clock clock;
 
@@ -27,6 +36,7 @@ public class AuthCookieService {
                 properties.getRefreshTokenName(),
                 token,
                 true,
+                requireConfigValue(properties.getPath(), "jobvault.security.cookies.path"),
                 expiresAt);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -36,6 +46,7 @@ public class AuthCookieService {
                 properties.getCsrfTokenName(),
                 token,
                 false,
+                CSRF_COOKIE_PATH,
                 expiresAt);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -45,6 +56,7 @@ public class AuthCookieService {
                 properties.getRefreshTokenName(),
                 "",
                 true,
+                requireConfigValue(properties.getPath(), "jobvault.security.cookies.path"),
                 clock.instant());
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -54,14 +66,15 @@ public class AuthCookieService {
                 properties.getCsrfTokenName(),
                 "",
                 false,
+                CSRF_COOKIE_PATH,
                 clock.instant());
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private ResponseCookie buildCookie(String name, String value, boolean httpOnly, Instant expiresAt) {
+    private ResponseCookie buildCookie(String name, String value, boolean httpOnly, String path, Instant expiresAt) {
         String cookieName = Objects.requireNonNull(requireConfigValue(name, "cookie name"), "cookie name");
         String sameSite = requireConfigValue(properties.getSameSite(), "jobvault.security.cookies.same-site");
-        String path = requireConfigValue(properties.getPath(), "jobvault.security.cookies.path");
+        String resolvedPath = requireConfigValue(path, "cookie path");
         Instant effectiveExpiresAt = requireExpiresAt(expiresAt);
         String cookieValue = value == null ? "" : value;
         Duration maxAge = Objects.requireNonNull(
@@ -73,7 +86,7 @@ public class AuthCookieService {
         return ResponseCookie.from(cookieName, cookieValue)
                 .httpOnly(httpOnly)
                 .secure(properties.isSecure())
-                .path(path)
+                .path(resolvedPath)
                 .sameSite(sameSite)
                 .maxAge(Objects.requireNonNull(maxAge, "maxAge"))
                 .build();

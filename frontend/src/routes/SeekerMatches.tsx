@@ -86,7 +86,7 @@ export default function SeekerMatches() {
     }
   }, []);
 
-  const loadMatches = async (offset: number) => {
+const loadMatches = async (offset: number) => {
     setLoading(true);
     setError(null);
     try {
@@ -96,10 +96,9 @@ export default function SeekerMatches() {
         setSelected(result.items[0]);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("ERR_AUTH_003")) {
+      if (err instanceof Error && err.message.includes("ERR_AUTH_003")) {
         setError("Your session has ended. Please sign in again.");
-      } else if (msg.includes("404") || msg.toLowerCase().includes("resume")) {
+      } else if (err instanceof ApiResponseError && err.response.status === 404) {
         setError("Upload a parsed resume first to see your matches.");
       } else {
         setError("Could not load matches. Please try again.");

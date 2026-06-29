@@ -12,6 +12,7 @@ import { ApiResponseError } from "../api/client";
 import { useAuth } from "../api/authContext";
 import { Alert, Badge, Button, Card, Divider, Spinner } from "../components/ui";
 import JobSkillsEditor from "../components/JobSkillsEditor";
+import JobApplyPanel from "../components/JobApplyPanel";
 
 function statusTone(status: JobDetailData["status"]): "neutral" | "success" | "warn" {
   if (status === "ACTIVE") return "success";
@@ -33,6 +34,7 @@ export default function JobDetailPage() {
   const { jobId } = useParams();
   const { isAuthenticated, isSessionReady, roles } = useAuth();
   const isEmployerViewer = isAuthenticated && roles.includes("EMPLOYER");
+  const isSeekerViewer = isAuthenticated && roles.includes("JOB_SEEKER");
 
   const [job, setJob] = useState<JobDetailData | null>(null);
   const [owned, setOwned] = useState(false);
@@ -87,9 +89,9 @@ export default function JobDetailPage() {
   const salaryLabel = job ? formatSalaryRange(job.salaryMin, job.salaryMax) : null;
   const backHref = owned
     ? "/employer"
-    : isAuthenticated && roles.includes("JOB_SEEKER")
+    : isSeekerViewer
       ? "/seeker/matches"
-      : "/";
+      : "/jobs";
 
   return (
     <main style={{ maxWidth: 820, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
@@ -148,6 +150,37 @@ export default function JobDetailPage() {
                 year: "numeric",
               })}
             </p>
+          )}
+
+          {/* Apply/draft action — this is the only path a seeker who arrived
+              via Browse (no parsed resume yet) has to act on a job, since
+              /seeker/matches requires one. Not shown for employer-owned jobs. */}
+          {!owned && (
+            <div style={{ marginBottom: "1.5rem" }}>
+              {isSeekerViewer ? (
+                <JobApplyPanel jobId={job.id} />
+              ) : !isAuthenticated ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "1rem",
+                    flexWrap: "wrap",
+                    padding: "0.875rem",
+                    background: "var(--bg-subtle)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <span style={{ fontSize: "0.875rem", color: "var(--ink-2)" }}>
+                    Sign in as a job seeker to apply to this role.
+                  </span>
+                  <Link to="/auth">
+                    <Button size="sm">Sign in</Button>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           )}
 
           <Divider label="Description" />

@@ -384,6 +384,9 @@ export default function AppLayout() {
                     <NavLink to="/seeker" className="nav-link">
                       Dashboard
                     </NavLink>
+                    <NavLink to="/jobs" className="nav-link">
+                      Browse jobs
+                    </NavLink>
                     <NavLink to="/seeker/matches" className="nav-link">
                       Matches
                     </NavLink>
@@ -413,9 +416,14 @@ export default function AppLayout() {
                 <span style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>Restoring session</span>
               </div>
             ) : (
-              <NavLink to="/auth" className="nav-link">
-                Sign in
-              </NavLink>
+              <>
+                <NavLink to="/jobs" className="nav-link">
+                  Browse jobs
+                </NavLink>
+                <NavLink to="/auth" className="nav-link">
+                  Sign in
+                </NavLink>
+              </>
             )}
           </nav>
         </div>
