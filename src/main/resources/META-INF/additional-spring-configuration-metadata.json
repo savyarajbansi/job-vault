@@ -70,7 +70,13 @@
     },
     {
       "name": "jobvault.security.cookies.path",
-      "type": "java.lang.String"
+      "type": "java.lang.String",
+      "description": "Cookie Path for the HttpOnly refresh-token cookie. Should be restricted to the auth endpoint (e.g. /api/auth)."
+    },
+    {
+      "name": "jobvault.security.cookies.csrf-path",
+      "type": "java.lang.String",
+      "description": "Cookie Path for the CSRF double-submit cookie. Must be / (or broad enough to cover all API routes) so the browser sends it on every request and JS can read it. Defaults to / when omitted."
     },
     {
       "name": "spring.mvc.cors.allowed-origins",

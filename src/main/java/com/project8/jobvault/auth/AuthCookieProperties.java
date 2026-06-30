@@ -16,8 +16,20 @@ public class AuthCookieProperties {
     @NotBlank
     private String sameSite;
 
+    /**
+     * Path for the HttpOnly refresh-token cookie. Should be restricted to the
+     * auth endpoint (e.g. {@code /api/auth}) so the browser only sends it there.
+     */
     @NotBlank
     private String path;
+
+    /**
+     * Path for the CSRF double-submit cookie. Must be {@code /} (or at least
+     * broad enough to cover every API endpoint) so the browser includes it on
+     * all requests and JS can read it to place in the {@code X-CSRF-Token}
+     * header. Defaults to {@code /} when not set in config.
+     */
+    private String csrfPath = "/";
 
     private boolean secure;
 
@@ -51,6 +63,14 @@ public class AuthCookieProperties {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    public String getCsrfPath() {
+        return csrfPath == null || csrfPath.isBlank() ? "/" : csrfPath;
+    }
+
+    public void setCsrfPath(String csrfPath) {
+        this.csrfPath = csrfPath;
     }
 
     public boolean isSecure() {

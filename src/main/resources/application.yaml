@@ -61,4 +61,7 @@ jobvault:
       csrf-token-name: csrf_token
       same-site: Lax
       secure: true
+      # HttpOnly refresh-token cookie — restricted to the auth endpoint only.
       path: /api/auth
+      # CSRF double-submit cookie — must be readable by JS across all routes.
+      csrf-path: /

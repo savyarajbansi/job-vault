@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { getNotifications, getUnreadNotificationCount, markNotificationRead, NotificationItem } from "../api/notifications";
 import { useAuth } from "../api/authContext";
 import { GlobalStyles, Badge, Button, Card, Spinner } from "../components/ui";
+
+const BADGE_POLL_MS = 60_000;   // badge count: every 60 s
+const PANEL_POLL_MS = 30_000;   // panel list: every 30 s while open
 
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
@@ -30,10 +33,7 @@ function NotificationBell() {
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // Load the unread count on mount and poll every 60 seconds while signed
-  // in. The bell panel also refreshes the full notification list whenever
-  // it's opened (see the effect below) — this just keeps the badge count
-  // from going stale during long sessions where the panel is never opened.
+  // ── Badge count: poll every 60 s while authenticated ────────────────────
   useEffect(() => {
     if (!isAuthenticated || !isSessionReady) {
       setCount(null);
@@ -46,70 +46,69 @@ function NotificationBell() {
     const loadCount = async () => {
       try {
         const response = await getUnreadNotificationCount();
-        if (!cancelled) {
-          setCount(response.unreadCount);
-        }
+        if (!cancelled) setCount(response.unreadCount);
       } catch {
-        if (!cancelled) {
-          setCount(null);
-        }
+        if (!cancelled) setCount(null);
       }
     };
 
     void loadCount();
-
-    const intervalId = setInterval(() => {
-      void loadCount();
-    }, 60_000);
+    const id = setInterval(() => void loadCount(), BADGE_POLL_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      clearInterval(id);
     };
   }, [isAuthenticated, isSessionReady]);
 
-  // Load the actual notification list whenever the panel is opened, so it
-  // shows real data instead of staying permanently empty.
+  // ── Panel list: load immediately on open, then re-poll every 30 s ───────
   useEffect(() => {
     if (!open || !isAuthenticated || !isSessionReady) {
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     const loadNotifications = async () => {
+      // Only show the full spinner on the very first load; subsequent polls
+      // refresh silently so the panel doesn't flicker while the user reads it.
+      if (items.length === 0) setLoading(true);
+      setError(null);
+
       try {
         const response = await getNotifications();
         if (!cancelled) {
           setItems(response);
+          // Keep the badge count in sync with what we just fetched.
+          const unread = response.filter((n) => !n.isRead).length;
+          setCount(unread);
         }
       } catch {
-        if (!cancelled) {
-          setError("Could not load notifications.");
-        }
+        if (!cancelled) setError("Could not load notifications.");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
     void loadNotifications();
+    const id = setInterval(() => void loadNotifications(), PANEL_POLL_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAuthenticated, isSessionReady]);
+  // items intentionally excluded — including it would restart the interval
+  // every time a mark-as-read optimistic update changes the array.
 
+  // ── Click-outside to close ───────────────────────────────────────────────
   useEffect(() => {
     const handler = (event: MouseEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -246,7 +245,6 @@ export default function AppLayout() {
     navigate("/auth");
   };
 
-  // Derive display name: use name, fall back to email prefix, fall back to "Account"
   const displayName = user?.displayName
     || (user?.email ? user.email.split("@")[0] : null)
     || "Account";
@@ -384,9 +382,6 @@ export default function AppLayout() {
                     <NavLink to="/seeker" className="nav-link">
                       Dashboard
                     </NavLink>
-                    <NavLink to="/jobs" className="nav-link">
-                      Browse jobs
-                    </NavLink>
                     <NavLink to="/seeker/matches" className="nav-link">
                       Matches
                     </NavLink>
@@ -416,14 +411,9 @@ export default function AppLayout() {
                 <span style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>Restoring session</span>
               </div>
             ) : (
-              <>
-                <NavLink to="/jobs" className="nav-link">
-                  Browse jobs
-                </NavLink>
-                <NavLink to="/auth" className="nav-link">
-                  Sign in
-                </NavLink>
-              </>
+              <NavLink to="/auth" className="nav-link">
+                Sign in
+              </NavLink>
             )}
           </nav>
         </div>
