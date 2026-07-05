@@ -70,8 +70,6 @@ function NotificationBell() {
     let cancelled = false;
 
     const loadNotifications = async () => {
-      // Only show the full spinner on the very first load; subsequent polls
-      // refresh silently so the panel doesn't flicker while the user reads it.
       if (items.length === 0) setLoading(true);
       setError(null);
 
@@ -79,7 +77,6 @@ function NotificationBell() {
         const response = await getNotifications();
         if (!cancelled) {
           setItems(response);
-          // Keep the badge count in sync with what we just fetched.
           const unread = response.filter((n) => !n.isRead).length;
           setCount(unread);
         }
@@ -99,8 +96,6 @@ function NotificationBell() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAuthenticated, isSessionReady]);
-  // items intentionally excluded — including it would restart the interval
-  // every time a mark-as-read optimistic update changes the array.
 
   // ── Click-outside to close ───────────────────────────────────────────────
   useEffect(() => {
@@ -140,7 +135,11 @@ function NotificationBell() {
           transition: "background 0.15s, border-color 0.15s, color 0.15s",
         }}
       >
-        <span aria-hidden="true">🔔</span>
+        <span aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5-6.71V3a2 2 0 1 0-4 0v1.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2z"/>
+          </svg>
+        </span>
         <span style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Alerts</span>
         {unread > 0 && (
           <span
@@ -387,6 +386,9 @@ export default function AppLayout() {
                     </NavLink>
                     <NavLink to="/seeker/applications" className="nav-link">
                       Applications
+                    </NavLink>
+                    <NavLink to="/seeker/profile" className="nav-link">
+                      Profile
                     </NavLink>
                   </>
                 )}
