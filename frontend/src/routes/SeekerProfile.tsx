@@ -18,12 +18,6 @@ function resumeStatusTone(status: string): "success" | "warn" | "neutral" | "acc
   return "neutral";
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", {
@@ -51,6 +45,209 @@ function profileErrorMessage(error: unknown): string {
     }
   }
   return "Could not save profile. Please try again.";
+}
+
+/* ── Profile summary card ────────────────────────────────────── */
+
+function ProfileSummaryCard({
+  profile,
+  history,
+}: {
+  profile: SeekerProfile;
+  history: ResumeHistoryItem[];
+}) {
+  const latestParsed = history.find((r) => r.status === "PARSED");
+  const hasAnyInfo =
+    profile.preferredSector ||
+    profile.preferredLocation ||
+    profile.yearsExperience != null ||
+    profile.remoteOk != null ||
+    latestParsed;
+
+  if (!hasAnyInfo) {
+    return (
+      <Card>
+        <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+          Your profile is empty. Fill in your preferences below and upload a resume to get
+          started.
+        </p>
+      </Card>
+    );
+  }
+
+  const topSkills = latestParsed ? latestParsed.inferredSkills.slice(0, 10) : [];
+
+  return (
+    <Card>
+      <h2 style={{ fontSize: "1.0625rem", marginBottom: "1rem" }}>Profile summary</h2>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        {/* Sector */}
+        {profile.preferredSector && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+              }}
+            >
+              Sector
+            </span>
+            <span style={{ fontSize: "0.9375rem", color: "var(--ink-2)" }}>
+              {profile.preferredSector}
+            </span>
+          </div>
+        )}
+
+        {/* Location */}
+        {profile.preferredLocation && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+              }}
+            >
+              Location
+            </span>
+            <span style={{ fontSize: "0.9375rem", color: "var(--ink-2)" }}>
+              {profile.preferredLocation}
+            </span>
+          </div>
+        )}
+
+        {/* Experience */}
+        {profile.yearsExperience != null && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+              }}
+            >
+              Experience
+            </span>
+            <span style={{ fontSize: "0.9375rem", color: "var(--ink-2)" }}>
+              {profile.yearsExperience} year{profile.yearsExperience !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
+
+        {/* Remote */}
+        {profile.remoteOk != null && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+              }}
+            >
+              Remote
+            </span>
+            <Badge tone={profile.remoteOk ? "accent" : "neutral"}>
+              {profile.remoteOk ? "Open to remote" : "On-site preferred"}
+            </Badge>
+          </div>
+        )}
+
+        {/* Resume status */}
+        {latestParsed && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+              }}
+            >
+              Resume
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <Badge tone="success">Parsed</Badge>
+              <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                {latestParsed.originalFilename}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Skills from resume */}
+        {topSkills.length > 0 && (
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                minWidth: 90,
+                flexShrink: 0,
+                paddingTop: "0.25rem",
+              }}
+            >
+              Skills
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+              {topSkills.map((skill) => (
+                <span
+                  key={skill}
+                  style={{
+                    padding: "0.2rem 0.55rem",
+                    background: "var(--accent-faint)",
+                    color: "var(--accent)",
+                    borderRadius: "999px",
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  {skill}
+                </span>
+              ))}
+              {latestParsed && latestParsed.inferredSkills.length > 10 && (
+                <span
+                  style={{
+                    padding: "0.2rem 0.55rem",
+                    background: "var(--bg-subtle)",
+                    color: "var(--ink-muted)",
+                    borderRadius: "999px",
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  +{latestParsed.inferredSkills.length - 10} more
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
 }
 
 /* ── Resume history row ──────────────────────────────────────── */
@@ -94,15 +291,13 @@ function ResumeRow({ item, isLatest }: { item: ResumeHistoryItem; isLatest: bool
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                maxWidth: 280,
+                maxWidth: 240,
               }}
             >
               {item.originalFilename}
             </span>
             <Badge tone={resumeStatusTone(item.status)}>{item.status}</Badge>
-            {isLatest && (
-              <Badge tone="accent">Current</Badge>
-            )}
+            {isLatest && <Badge tone="accent">Current</Badge>}
           </div>
           <div
             style={{
@@ -166,13 +361,9 @@ function ResumeRow({ item, isLatest }: { item: ResumeHistoryItem; isLatest: bool
   );
 }
 
-/* ── Upload zone ─────────────────────────────────────────────── */
+/* ── Upload zone (compact) ───────────────────────────────────── */
 
-function ResumeUploadZone({
-  onSuccess,
-}: {
-  onSuccess: () => void;
-}) {
+function ResumeUploadZone({ onSuccess }: { onSuccess: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -234,7 +425,8 @@ function ResumeUploadZone({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+      {/* Compact drop zone */}
       <div
         role="button"
         tabIndex={0}
@@ -248,7 +440,7 @@ function ResumeUploadZone({
           border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
           borderRadius: "var(--radius)",
           background: dragOver ? "var(--accent-faint)" : "var(--bg-subtle)",
-          padding: "2.5rem 1.5rem",
+          padding: "1.25rem 1rem",
           textAlign: "center",
           cursor: uploading ? "not-allowed" : "pointer",
           transition: "border-color 0.15s, background 0.15s",
@@ -265,46 +457,35 @@ function ResumeUploadZone({
         />
 
         {uploading ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
-            <Spinner size={28} />
-            <p style={{ color: "var(--ink-muted)", fontSize: "0.9375rem" }}>Uploading and parsing...</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem" }}>
+            <Spinner size={20} />
+            <span style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>Uploading and parsing...</span>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "var(--accent-faint)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: "0.25rem",
-              }}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem" }}>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--accent)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ color: "var(--ink-2)", fontWeight: 500, fontSize: "0.875rem", margin: 0 }}>
+                Drop a PDF here, or click to browse
+              </p>
+              <p style={{ color: "var(--ink-muted)", fontSize: "0.75rem", margin: 0 }}>
+                PDF only — max 10 MB
+              </p>
             </div>
-            <p style={{ color: "var(--ink-2)", fontWeight: 500, fontSize: "0.9375rem" }}>
-              Drop your resume here, or click to browse
-            </p>
-            <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
-              PDF only — max 10 MB
-            </p>
           </div>
         )}
       </div>
@@ -339,8 +520,7 @@ function ProfileForm({
     setError(null);
     setSaved(false);
 
-    const parsedYears =
-      yearsExperience.trim() === "" ? null : Number(yearsExperience);
+    const parsedYears = yearsExperience.trim() === "" ? null : Number(yearsExperience);
 
     if (
       parsedYears !== null &&
@@ -374,13 +554,7 @@ function ProfileForm({
         {error && <Alert tone="error">{error}</Alert>}
         {saved && <Alert tone="success">Profile saved.</Alert>}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "1rem",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <Input
             label="Preferred sector"
             type="text"
@@ -484,84 +658,111 @@ export default function SeekerProfile() {
   }, []);
 
   const latestParsedId = history.find((r) => r.status === "PARSED")?.resumeId ?? null;
+  const isLoading = profileLoading || historyLoading;
 
   return (
-    <main style={{ maxWidth: 860, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       {/* Page header */}
-      <div style={{ marginBottom: "2rem" }}>
+      <div style={{ marginBottom: "1.75rem" }}>
         <h1 style={{ marginBottom: "0.25rem" }}>Profile</h1>
         <p style={{ color: "var(--ink-muted)", fontSize: "0.9375rem" }}>
-          Keep your resume and preferences up to date so your matches stay accurate.
+          Keep your preferences and resume up to date so your matches stay accurate.
         </p>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-        {/* Resume upload */}
-        <Card>
-          <h2 style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>Resume</h2>
-          <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-            Upload a PDF resume. Skills are extracted automatically and used to rank your job
-            matches. Uploading a new resume replaces your active skill set.
-          </p>
+      {isLoading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
+          <Spinner size={32} />
+        </div>
+      ) : (
+        /*
+          Two-column layout:
+          - Left (primary): profile summary + edit form
+          - Right (secondary): resume upload + history
+        */
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "3fr 2fr",
+            gap: "1.5rem",
+            alignItems: "start",
+          }}
+        >
+          {/* ── Left column: summary + edit ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
-          <ResumeUploadZone
-            onSuccess={() => {
-              void loadHistory();
-            }}
-          />
+            {/* Profile summary */}
+            {profile && !profileError && (
+              <ProfileSummaryCard profile={profile} history={history} />
+            )}
 
-          {/* Resume history */}
-          <div style={{ marginTop: "1.5rem" }}>
-            <Divider label="Upload history" />
-            <div style={{ marginTop: "1rem" }}>
-              {historyLoading ? (
-                <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem 0" }}>
-                  <Spinner size={22} />
-                </div>
-              ) : history.length === 0 ? (
-                <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
-                  No resumes uploaded yet.
-                </p>
-              ) : (
-                <Card padded={false}>
-                  {history.map((item) => (
-                    <ResumeRow
-                      key={item.resumeId}
-                      item={item}
-                      isLatest={item.resumeId === latestParsedId}
-                    />
-                  ))}
-                </Card>
-              )}
-            </div>
+            {/* Edit form */}
+            <Card>
+              <h2 style={{ fontSize: "1.0625rem", marginBottom: "0.25rem" }}>
+                Matching preferences
+              </h2>
+              <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
+                These fields feed directly into the experience and location factors of your match
+                scores. A populated field improves accuracy; leaving one blank means it won't
+                factor in.
+              </p>
+
+              {profileError ? (
+                <Alert tone="error">{profileError}</Alert>
+              ) : profile ? (
+                <ProfileForm
+                  profile={profile}
+                  onSaved={(updated) => setProfile(updated)}
+                />
+              ) : null}
+            </Card>
           </div>
-        </Card>
 
-        {/* Matching preferences */}
-        <Card>
-          <h2 style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
-            Matching preferences
-          </h2>
-          <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
-            These fields feed directly into the experience and location factors of your match
-            scores. Leaving a field blank is treated as unspecified — the scoring engine will
-            not penalize you, but a populated field will improve accuracy.
-          </p>
+          {/* ── Right column: resume ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            <Card>
+              <h2 style={{ fontSize: "1.0625rem", marginBottom: "0.25rem" }}>Resume</h2>
+              <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "1.25rem" }}>
+                Upload a PDF resume. Skills are extracted automatically and used to rank your job
+                matches. Uploading a new resume replaces your active skill set.
+              </p>
 
-          {profileLoading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem 0" }}>
-              <Spinner size={22} />
-            </div>
-          ) : profileError ? (
-            <Alert tone="error">{profileError}</Alert>
-          ) : profile ? (
-            <ProfileForm
-              profile={profile}
-              onSaved={(updated) => setProfile(updated)}
-            />
-          ) : null}
-        </Card>
-      </div>
+              <ResumeUploadZone
+                onSuccess={() => {
+                  void loadHistory();
+                  void loadProfile();
+                }}
+              />
+
+              {/* Resume history */}
+              <div style={{ marginTop: "1.5rem" }}>
+                <Divider label="Upload history" />
+                <div style={{ marginTop: "1rem" }}>
+                  {historyLoading ? (
+                    <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem 0" }}>
+                      <Spinner size={22} />
+                    </div>
+                  ) : history.length === 0 ? (
+                    <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+                      No resumes uploaded yet.
+                    </p>
+                  ) : (
+                    <Card padded={false}>
+                      {history.map((item) => (
+                        <ResumeRow
+                          key={item.resumeId}
+                          item={item}
+                          isLatest={item.resumeId === latestParsedId}
+                        />
+                      ))}
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

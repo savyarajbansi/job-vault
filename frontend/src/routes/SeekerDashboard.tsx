@@ -59,7 +59,7 @@ function StatCard({
         background: "var(--bg-card)",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius)",
-        padding: "1.25rem 1.5rem",
+        padding: "1.125rem 1.25rem",
         boxShadow: "var(--shadow-sm)",
         display: "flex",
         flexDirection: "column",
@@ -68,7 +68,7 @@ function StatCard({
     >
       <span
         style={{
-          fontSize: "0.75rem",
+          fontSize: "0.7rem",
           fontWeight: 600,
           letterSpacing: "0.07em",
           textTransform: "uppercase",
@@ -80,7 +80,7 @@ function StatCard({
       <span
         style={{
           fontFamily: "var(--font-display)",
-          fontSize: "2rem",
+          fontSize: "1.875rem",
           fontWeight: 700,
           lineHeight: 1.1,
           color: "var(--ink)",
@@ -89,7 +89,7 @@ function StatCard({
         {value}
       </span>
       {sub && (
-        <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>{sub}</span>
+        <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>{sub}</span>
       )}
     </div>
   );
@@ -108,12 +108,12 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           background: "var(--bg-card)",
           border: "1px solid var(--border)",
           borderRadius: "var(--radius)",
-          padding: "1.125rem 1.25rem",
+          padding: "1rem 1.125rem",
           boxShadow: "var(--shadow-sm)",
           transition: "border-color 0.15s, box-shadow 0.15s",
           cursor: "pointer",
           display: "flex",
-          gap: "1rem",
+          gap: "0.875rem",
           alignItems: "flex-start",
         }}
         onMouseEnter={(e) => {
@@ -133,8 +133,8 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             borderRadius: "var(--radius-sm)",
             background: "var(--bg-subtle)",
             border: "1px solid var(--border)",
@@ -143,7 +143,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           <span
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "1.0625rem",
+              fontSize: "1rem",
               fontWeight: 700,
               lineHeight: 1,
               color: scoreColor(item.score),
@@ -151,13 +151,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           >
             {pct}
           </span>
-          <span
-            style={{
-              fontSize: "0.6rem",
-              color: "var(--ink-faint)",
-              letterSpacing: "0.04em",
-            }}
-          >
+          <span style={{ fontSize: "0.5625rem", color: "var(--ink-faint)", letterSpacing: "0.04em" }}>
             %
           </span>
         </div>
@@ -178,18 +172,11 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
             {item.job.title}
           </div>
           {item.job.companyName && (
-            <div
-              style={{
-                fontSize: "0.8125rem",
-                color: "var(--ink-2)",
-                fontWeight: 500,
-                marginBottom: "0.375rem",
-              }}
-            >
+            <div style={{ fontSize: "0.8125rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.35rem" }}>
               {item.job.companyName}
             </div>
           )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
             {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
             {item.job.remoteEligible && <Badge tone="accent">Remote</Badge>}
             {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
@@ -218,7 +205,8 @@ export default function SeekerDashboard() {
 
   const [resumeStatus, setResumeStatus] = useState<string | null>(null);
   const [skillCount, setSkillCount] = useState<number | null>(null);
-  const [topSkills, setTopSkills] = useState<string[]>([]);
+  // Skills extracted from the user's own resume
+  const [resumeSkills, setResumeSkills] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
   const [appCounts, setAppCounts] = useState({
@@ -264,7 +252,7 @@ export default function SeekerDashboard() {
         setResumeStatus(parsed ? "Ready" : result.items.length > 0 ? "Not parsed" : "None");
         if (parsed) {
           setSkillCount(parsed.inferredSkills.length);
-          setTopSkills(parsed.inferredSkills.slice(0, 8));
+          setResumeSkills(parsed.inferredSkills.slice(0, 8));
         } else {
           setSkillCount(0);
         }
@@ -304,8 +292,7 @@ export default function SeekerDashboard() {
   }, []);
 
   const greeting = useMemo(() => {
-    const name =
-      user?.displayName ?? user?.email?.split("@")[0] ?? "there";
+    const name = user?.displayName ?? user?.email?.split("@")[0] ?? "there";
     return `Welcome back, ${name}`;
   }, [user]);
 
@@ -314,7 +301,7 @@ export default function SeekerDashboard() {
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       {/* Header */}
-      <div style={{ marginBottom: "2rem" }}>
+      <div style={{ marginBottom: "1.75rem" }}>
         <h1 style={{ marginBottom: "0.25rem" }}>{greeting}</h1>
         <p style={{ color: "var(--ink-muted)", fontSize: "0.9375rem" }}>
           Here is your job search at a glance.
@@ -336,21 +323,9 @@ export default function SeekerDashboard() {
               marginBottom: "2rem",
             }}
           >
-            <StatCard
-              label="Total matches"
-              value={matchTotal}
-              sub="across active roles"
-            />
-            <StatCard
-              label="Applications"
-              value={appCounts.total}
-              sub={`${appCounts.submitted} submitted`}
-            />
-            <StatCard
-              label="Under review"
-              value={appCounts.underReview}
-              sub="by employers"
-            />
+            <StatCard label="Total matches" value={matchTotal} sub="across active roles" />
+            <StatCard label="Applications" value={appCounts.total} sub={`${appCounts.submitted} submitted`} />
+            <StatCard label="Under review" value={appCounts.underReview} sub="by employers" />
             <StatCard
               label="Resume"
               value={resumeStatus ?? "—"}
@@ -360,11 +335,7 @@ export default function SeekerDashboard() {
                   : "Upload on Profile page"
               }
             />
-            <StatCard
-              label="Skills"
-              value={skillCount ?? 0}
-              sub="detected from resume"
-            />
+            <StatCard label="Skills detected" value={skillCount ?? 0} sub="from your resume" />
           </div>
 
           {/* No resume prompt */}
@@ -372,10 +343,7 @@ export default function SeekerDashboard() {
             <div style={{ marginBottom: "1.5rem" }}>
               <Alert tone="info">
                 Upload a resume on your{" "}
-                <Link
-                  to="/seeker/profile"
-                  style={{ color: "var(--accent)", fontWeight: 500 }}
-                >
+                <Link to="/seeker/profile" style={{ color: "var(--accent)", fontWeight: 500 }}>
                   Profile page
                 </Link>{" "}
                 to unlock ranked job matches and skill gap analysis.
@@ -383,16 +351,20 @@ export default function SeekerDashboard() {
             </div>
           )}
 
-          {/* Main grid */}
+          {/*
+            Main grid: left column takes 3/5, right column takes 2/5.
+            This gives the content-heavy left side more room while keeping
+            the sidebar panels comfortably readable.
+          */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1.5fr) minmax(260px, 0.6fr)",
+              gridTemplateColumns: "3fr 2fr",
               gap: "1.5rem",
               alignItems: "start",
             }}
           >
-            {/* Left: matches + recent applications */}
+            {/* Left: top matches + recent applications */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
               {/* Top matches */}
@@ -406,14 +378,10 @@ export default function SeekerDashboard() {
                     marginBottom: "0.875rem",
                   }}
                 >
-                  <h2 style={{ fontSize: "1.125rem" }}>Top matches</h2>
+                  <h2 style={{ fontSize: "1.0625rem" }}>Top matches</h2>
                   <Link
                     to="/seeker/matches"
-                    style={{
-                      fontSize: "0.875rem",
-                      color: "var(--accent)",
-                      fontWeight: 500,
-                    }}
+                    style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
                   >
                     View all{matchTotal > 0 ? ` (${matchTotal})` : ""}
                   </Link>
@@ -430,7 +398,7 @@ export default function SeekerDashboard() {
                 )}
 
                 {matchItems.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                     {matchItems.map((item) => (
                       <MatchCard key={item.jobId} item={item} />
                     ))}
@@ -449,14 +417,10 @@ export default function SeekerDashboard() {
                     marginBottom: "0.875rem",
                   }}
                 >
-                  <h2 style={{ fontSize: "1.125rem" }}>Recent applications</h2>
+                  <h2 style={{ fontSize: "1.0625rem" }}>Recent applications</h2>
                   <Link
                     to="/seeker/applications"
-                    style={{
-                      fontSize: "0.875rem",
-                      color: "var(--accent)",
-                      fontWeight: 500,
-                    }}
+                    style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
                   >
                     View all
                   </Link>
@@ -484,9 +448,7 @@ export default function SeekerDashboard() {
                           gap: "1rem",
                           padding: "0.875rem 1.25rem",
                           borderBottom:
-                            idx < recentApps.length - 1
-                              ? "1px solid var(--border)"
-                              : "none",
+                            idx < recentApps.length - 1 ? "1px solid var(--border)" : "none",
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
@@ -503,13 +465,7 @@ export default function SeekerDashboard() {
                             {app.jobTitle ?? "Untitled role"}
                           </div>
                           {app.companyName && (
-                            <div
-                              style={{
-                                fontSize: "0.8125rem",
-                                color: "var(--ink-muted)",
-                                marginTop: "0.125rem",
-                              }}
-                            >
+                            <div style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginTop: "0.125rem" }}>
                               {app.companyName}
                             </div>
                           )}
@@ -524,64 +480,77 @@ export default function SeekerDashboard() {
               </section>
             </div>
 
-            {/* Right: skills + quick links */}
+            {/* Right sidebar */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
-              {/* Top skills */}
+              {/*
+                "Skills from your resume" — intentionally distinct from the
+                market-wide trending skills shown on the Browse Jobs page.
+                The heading makes the source of data clear.
+              */}
               <section>
-                <h2 style={{ fontSize: "1.125rem", marginBottom: "0.875rem" }}>
-                  Top skills
-                </h2>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    gap: "1rem",
+                    marginBottom: "0.875rem",
+                  }}
+                >
+                  <h2 style={{ fontSize: "1.0625rem" }}>Skills from your resume</h2>
+                  <Link
+                    to="/seeker/profile"
+                    style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
+                  >
+                    Update
+                  </Link>
+                </div>
                 <Card>
-                  {topSkills.length === 0 ? (
+                  {resumeSkills.length === 0 ? (
                     <div>
-                      <p
-                        style={{
-                          color: "var(--ink-muted)",
-                          fontSize: "0.875rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        No skills detected yet.
+                      <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "0.625rem" }}>
+                        No skills detected yet. Upload a resume on your Profile page to get started.
                       </p>
                       <Link
                         to="/seeker/profile"
-                        style={{
-                          fontSize: "0.875rem",
-                          color: "var(--accent)",
-                          fontWeight: 500,
-                        }}
+                        style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
                       >
-                        Upload a resume to get started
+                        Go to Profile
                       </Link>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      {topSkills.map((skill) => (
-                        <span
-                          key={skill}
-                          style={{
-                            padding: "0.25rem 0.625rem",
-                            background: "var(--accent-faint)",
-                            color: "var(--accent)",
-                            borderRadius: "999px",
-                            fontSize: "0.8125rem",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
+                    <>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                        {resumeSkills.map((skill) => (
+                          <span
+                            key={skill}
+                            style={{
+                              padding: "0.25rem 0.625rem",
+                              background: "var(--accent-faint)",
+                              color: "var(--accent)",
+                              borderRadius: "999px",
+                              fontSize: "0.8125rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                      {skillCount !== null && skillCount > resumeSkills.length && (
+                        <p style={{ marginTop: "0.625rem", fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                          +{skillCount - resumeSkills.length} more on your profile
+                        </p>
+                      )}
+                    </>
                   )}
                 </Card>
               </section>
 
               {/* Quick links */}
               <section>
-                <h2 style={{ fontSize: "1.125rem", marginBottom: "0.875rem" }}>
-                  Quick links
-                </h2>
+                <h2 style={{ fontSize: "1.0625rem", marginBottom: "0.875rem" }}>Quick links</h2>
                 <Card padded={false}>
                   {[
                     { to: "/seeker/matches", label: "View job matches" },
@@ -597,8 +566,7 @@ export default function SeekerDashboard() {
                         alignItems: "center",
                         justifyContent: "space-between",
                         padding: "0.75rem 1.25rem",
-                        borderBottom:
-                          idx < arr.length - 1 ? "1px solid var(--border)" : "none",
+                        borderBottom: idx < arr.length - 1 ? "1px solid var(--border)" : "none",
                         color: "var(--ink-2)",
                         fontSize: "0.9375rem",
                         fontWeight: 500,
@@ -606,22 +574,14 @@ export default function SeekerDashboard() {
                         transition: "background 0.12s",
                       }}
                       onMouseEnter={(e) => {
-                        (
-                          e.currentTarget as HTMLAnchorElement
-                        ).style.background = "var(--bg-subtle)";
+                        (e.currentTarget as HTMLAnchorElement).style.background = "var(--bg-subtle)";
                       }}
                       onMouseLeave={(e) => {
-                        (
-                          e.currentTarget as HTMLAnchorElement
-                        ).style.background = "transparent";
+                        (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
                       }}
                     >
                       <span>{link.label}</span>
-                      <span
-                        style={{ color: "var(--ink-faint)", fontSize: "0.875rem" }}
-                      >
-                        ›
-                      </span>
+                      <span style={{ color: "var(--ink-faint)", fontSize: "0.875rem" }}>›</span>
                     </Link>
                   ))}
                 </Card>
