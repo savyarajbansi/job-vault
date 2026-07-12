@@ -43,11 +43,12 @@ export default function SeekerApplications() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = async (): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
       setItems(await getMyApplications());
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       setError(
@@ -55,6 +56,7 @@ export default function SeekerApplications() {
           ? "Your session has ended. Please sign in again."
           : "Could not load your applications."
       );
+      return false;
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,12 @@ export default function SeekerApplications() {
     setActionError(null);
     try {
       await withdrawApplication(id);
-      await load();
+      const refreshed = await load();
+      if (!refreshed) {
+        setActionError(
+          "Your application was withdrawn, but we couldn't refresh the applications list. Please refresh the page."
+        );
+      }
     } catch (err) {
       setActionError(withdrawError(err));
     } finally {
@@ -78,12 +85,14 @@ export default function SeekerApplications() {
   };
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
-      <div style={{ marginBottom: "1.5rem" }}>
-        <h1 style={{ marginBottom: "0.375rem" }}>My applications</h1>
-        <p style={{ color: "var(--ink-muted)" }}>
-          Every job you've applied to or saved as a draft, with its current status.
-        </p>
+    <main className="page seeker-page">
+      <div className="page-header" style={{ marginBottom: "var(--space-6)" }}>
+        <div className="page-header__copy">
+          <h1>My applications</h1>
+          <p className="page-header__subtitle">
+            Every job you've applied to or saved as a draft, with its current status.
+          </p>
+        </div>
       </div>
 
       {error && <Alert tone={error.includes("session") ? "info" : "error"}>{error}</Alert>}

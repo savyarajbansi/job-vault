@@ -378,8 +378,11 @@ export default function AppLayout() {
                   </>
                 ) : (
                   <>
-                    <NavLink to="/seeker" className="nav-link">
+                    <NavLink to="/seeker" end className="nav-link">
                       Dashboard
+                    </NavLink>
+                    <NavLink to="/jobs" className="nav-link">
+                      Browse jobs
                     </NavLink>
                     <NavLink to="/seeker/matches" className="nav-link">
                       Matches

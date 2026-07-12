@@ -16,7 +16,9 @@ import type {
 import { formatSalaryRange, EDUCATION_LABELS } from "../api/employer";
 import type { ApplicationStatus } from "../api/employer";
 import { ApiResponseError } from "../api/client";
-import { Button, Alert, Card, Badge, Spinner, ScoreBar } from "../components/ui";
+import { Button, Alert, Card, Badge, Spinner, ScoreBar, Icon } from "../components/ui";
+
+const MATCHES_PER_PAGE = 10;
 
 function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
@@ -58,7 +60,6 @@ export default function SeekerMatches() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const limit = 10;
 
   const [selected, setSelected] = useState<SeekerMatchItem | null>(null);
   const [gaps, setGaps] = useState<string[] | null>(null);
@@ -71,7 +72,7 @@ export default function SeekerMatches() {
   >("idle");
   const [applicationActionError, setApplicationActionError] = useState<string | null>(null);
 
-  const loadApplications = useCallback(async () => {
+  const loadApplications = useCallback(async (): Promise<boolean> => {
     try {
       const items = await getMyApplications();
       const byJobId: Record<string, SeekerApplicationItem> = {};
@@ -81,20 +82,20 @@ export default function SeekerMatches() {
         }
       }
       setApplicationsByJobId(byJobId);
+      return true;
     } catch {
       // Non-fatal — matches still render without application status.
+      return false;
     }
   }, []);
 
-const loadMatches = async (offset: number) => {
+  const loadMatches = useCallback(async (offset: number) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getSeekerMatches({ limit, offset });
+      const result = await getSeekerMatches({ limit: MATCHES_PER_PAGE, offset });
       setMatches(result);
-      if (result.items.length > 0 && !selected) {
-        setSelected(result.items[0]);
-      }
+      setSelected((current) => current ?? result.items[0] ?? null);
     } catch (err) {
       if (err instanceof Error && err.message.includes("ERR_AUTH_003")) {
         setError("Your session has ended. Please sign in again.");
@@ -106,7 +107,7 @@ const loadMatches = async (offset: number) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const loadGaps = async (jobId: string) => {
     setGapsLoading(true);
@@ -123,8 +124,8 @@ const loadMatches = async (offset: number) => {
   };
 
   useEffect(() => {
-    void loadMatches(page * limit);
-  }, [page]);
+    void loadMatches(page * MATCHES_PER_PAGE);
+  }, [loadMatches, page]);
 
   useEffect(() => {
     void loadApplications();
@@ -136,7 +137,9 @@ const loadMatches = async (offset: number) => {
   }, [selected]);
 
   const total = matches?.page.total ?? 0;
-  const totalPages = Math.ceil(total / limit);
+  const totalPages = Math.ceil(total / MATCHES_PER_PAGE);
+  const hasNextPage =
+    matches !== null && matches.items.length === MATCHES_PER_PAGE && page < totalPages - 1;
   const selectedSalaryLabel = selected
     ? formatSalaryRange(selected.job.salaryMin, selected.job.salaryMax)
     : null;
@@ -156,22 +159,34 @@ const loadMatches = async (offset: number) => {
       } else if (selectedApplication) {
         await withdrawApplication(selectedApplication.id);
       }
-      await loadApplications();
+      const applicationsReloaded = await loadApplications();
+      if (!applicationsReloaded) {
+        setApplicationActionError(
+          "Your application was updated, but we couldn't refresh the latest application status."
+        );
+      }
     } catch (err) {
       setApplicationActionError(describeApplicationActionError(err));
-      await loadApplications();
+      const applicationsReloaded = await loadApplications();
+      if (!applicationsReloaded) {
+        setApplicationActionError(
+          `${describeApplicationActionError(err)} We also couldn't refresh your latest application status.`
+        );
+      }
     } finally {
       setApplicationActionState("idle");
     }
   };
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}>
-      <div style={{ marginBottom: "1.75rem" }}>
-        <h1 style={{ marginBottom: "0.375rem" }}>Job Matches</h1>
-        <p style={{ color: "var(--ink-muted)" }}>
-          Ranked by fit based on your resume, skills, experience, and preferences.
-        </p>
+    <main className="page seeker-page">
+      <div className="page-header">
+        <div className="page-header__copy">
+          <h1>Job Matches</h1>
+          <p className="page-header__subtitle">
+            Ranked by fit based on your resume, skills, experience, and preferences.
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -185,7 +200,7 @@ const loadMatches = async (offset: number) => {
       )}
 
       {!loading && !error && matches && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "1.5rem", alignItems: "start" }}>
+        <div className="seeker-matches__content">
           {/* ── Match list ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {matches.items.length === 0 && (
@@ -217,11 +232,11 @@ const loadMatches = async (offset: number) => {
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: "0.9375rem", marginBottom: "0.125rem" }}>
+                      <div style={{ fontWeight: 500, color: "var(--ink)", fontSize: "0.9375rem", marginBottom: "0.125rem" }}>
                         {item.job.title}
                       </div>
                       {item.job.companyName && (
-                        <div style={{ fontSize: "0.8125rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.4rem" }}>
+                        <div style={{ fontSize: "0.8125rem", color: "var(--ink-2)", marginBottom: "0.4rem" }}>
                           {item.job.companyName}
                         </div>
                       )}
@@ -247,7 +262,7 @@ const loadMatches = async (offset: number) => {
                       style={{
                         fontFamily: "var(--font-display)",
                         fontSize: "1.25rem",
-                        fontWeight: 700,
+                        fontWeight: 600,
                         color: scoreColor(item.score),
                         flexShrink: 0,
                       }}
@@ -276,7 +291,7 @@ const loadMatches = async (offset: number) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={page >= totalPages - 1}
+                  disabled={!hasNextPage}
                   onClick={() => setPage((p) => p + 1)}
                 >
                   Next →
@@ -290,16 +305,16 @@ const loadMatches = async (offset: number) => {
           </div>
 
           {/* ── Detail panel ── */}
-          <div style={{ position: "sticky", top: 72 }}>
+          <div className="seeker-matches__detail" style={{ position: "sticky", top: 72 }}>
             {selected ? (
               <Card style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 {/* Header */}
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--ink)", marginBottom: "0.25rem" }}>
+                  <div style={{ fontWeight: 600, fontSize: "1.0625rem", color: "var(--ink)", marginBottom: "0.25rem" }}>
                     {selected.job.title}
                   </div>
                   {selected.job.companyName && (
-                    <div style={{ fontSize: "0.875rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.375rem" }}>
+                    <div style={{ fontSize: "0.875rem", color: "var(--ink-2)", marginBottom: "0.375rem" }}>
                       {selected.job.companyName}
                     </div>
                   )}
@@ -330,7 +345,7 @@ const loadMatches = async (offset: number) => {
                       style={{
                         fontFamily: "var(--font-display)",
                         fontSize: "1.5rem",
-                        fontWeight: 700,
+                        fontWeight: 600,
                         color: scoreColor(selected.score),
                       }}
                     >
@@ -484,9 +499,23 @@ const loadMatches = async (offset: number) => {
                   {gapsError && <p style={{ fontSize: "0.875rem", color: "var(--warn)" }}>{gapsError}</p>}
                   {gaps !== null && !gapsLoading && gaps.length === 0 && (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span style={{ fontSize: "1.125rem" }}>✅</span>
-                      <span style={{ fontSize: "0.875rem", color: "var(--success)", fontWeight: 500 }}>
-                        No skill gaps — strong match!
+                      <span
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "999px",
+                          background: "var(--success-faint)",
+                          color: "var(--success)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon name="check" size={14} />
+                      </span>
+                      <span style={{ fontSize: "0.875rem", color: "var(--success)" }}>
+                        No skill gaps - strong match!
                       </span>
                     </div>
                   )}

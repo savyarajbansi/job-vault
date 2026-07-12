@@ -4,6 +4,9 @@ import { getSeekerMatches, getSeekerResumeHistory, getMyApplications } from "../
 import type { SeekerMatchItem } from "../api/seeker";
 import type { ApplicationStatus } from "../api/employer";
 import { formatSalaryRange } from "../api/employer";
+import { getTrendingSkills } from "../api/jobs";
+import type { TrendingSkill } from "../api/jobs";
+import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Card, Spinner } from "../components/ui";
 import { useAuth } from "../api/authContext";
 
@@ -205,9 +208,9 @@ export default function SeekerDashboard() {
 
   const [resumeStatus, setResumeStatus] = useState<string | null>(null);
   const [skillCount, setSkillCount] = useState<number | null>(null);
-  // Skills extracted from the user's own resume
-  const [resumeSkills, setResumeSkills] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [trendingSkills, setTrendingSkills] = useState<TrendingSkill[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
 
   const [appCounts, setAppCounts] = useState({
     total: 0,
@@ -234,7 +237,7 @@ export default function SeekerDashboard() {
         setMatchTotal(result.page.total);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("404") || msg.includes("resume")) {
+        if (err instanceof ApiResponseError && err.response.status === 404) {
           setNoResume(true);
         } else if (!msg.includes("ERR_AUTH_003")) {
           setMatchError("Could not load matches.");
@@ -252,7 +255,6 @@ export default function SeekerDashboard() {
         setResumeStatus(parsed ? "Ready" : result.items.length > 0 ? "Not parsed" : "None");
         if (parsed) {
           setSkillCount(parsed.inferredSkills.length);
-          setResumeSkills(parsed.inferredSkills.slice(0, 8));
         } else {
           setSkillCount(0);
         }
@@ -286,9 +288,20 @@ export default function SeekerDashboard() {
       }
     };
 
+    const loadTrending = async () => {
+      try {
+        setTrendingSkills(await getTrendingSkills());
+      } catch {
+        // Non-fatal: the rest of the dashboard remains useful without this signal.
+      } finally {
+        setTrendingLoading(false);
+      }
+    };
+
     void loadMatches();
     void loadHistory();
     void loadApps();
+    void loadTrending();
   }, []);
 
   const greeting = useMemo(() => {
@@ -299,13 +312,13 @@ export default function SeekerDashboard() {
   const dataLoading = matchLoading || historyLoading;
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main className="page seeker-page">
       {/* Header */}
-      <div style={{ marginBottom: "1.75rem" }}>
-        <h1 style={{ marginBottom: "0.25rem" }}>{greeting}</h1>
-        <p style={{ color: "var(--ink-muted)", fontSize: "0.9375rem" }}>
-          Here is your job search at a glance.
-        </p>
+      <div className="page-header">
+        <div className="page-header__copy">
+          <h1>{greeting}</h1>
+          <p className="page-header__subtitle">Here is your job search at a glance.</p>
+        </div>
       </div>
 
       {dataLoading ? (
@@ -315,14 +328,7 @@ export default function SeekerDashboard() {
       ) : (
         <>
           {/* Stats row */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "1rem",
-              marginBottom: "2rem",
-            }}
-          >
+          <div className="seeker-dashboard__stats">
             <StatCard label="Total matches" value={matchTotal} sub="across active roles" />
             <StatCard label="Applications" value={appCounts.total} sub={`${appCounts.submitted} submitted`} />
             <StatCard label="Under review" value={appCounts.underReview} sub="by employers" />
@@ -356,14 +362,7 @@ export default function SeekerDashboard() {
             This gives the content-heavy left side more room while keeping
             the sidebar panels comfortably readable.
           */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "3fr 2fr",
-              gap: "1.5rem",
-              alignItems: "start",
-            }}
-          >
+          <div className="seeker-dashboard__content">
             {/* Left: top matches + recent applications */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
@@ -483,11 +482,6 @@ export default function SeekerDashboard() {
             {/* Right sidebar */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
-              {/*
-                "Skills from your resume" — intentionally distinct from the
-                market-wide trending skills shown on the Browse Jobs page.
-                The heading makes the source of data clear.
-              */}
               <section>
                 <div
                   style={{
@@ -498,94 +492,48 @@ export default function SeekerDashboard() {
                     marginBottom: "0.875rem",
                   }}
                 >
-                  <h2 style={{ fontSize: "1.0625rem" }}>Skills from your resume</h2>
+                  <h2 style={{ fontSize: "1.0625rem" }}>Trending skills</h2>
                   <Link
-                    to="/seeker/profile"
+                    to="/jobs"
                     style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
                   >
-                    Update
+                    Browse jobs
                   </Link>
                 </div>
                 <Card>
-                  {resumeSkills.length === 0 ? (
-                    <div>
-                      <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "0.625rem" }}>
-                        No skills detected yet. Upload a resume on your Profile page to get started.
-                      </p>
-                      <Link
-                        to="/seeker/profile"
-                        style={{ fontSize: "0.875rem", color: "var(--accent)", fontWeight: 500 }}
-                      >
-                        Go to Profile
-                      </Link>
+                  {trendingLoading ? (
+                    <div style={{ display: "flex", justifyContent: "center", padding: "1rem 0" }}>
+                      <Spinner size={20} />
                     </div>
+                  ) : trendingSkills.length === 0 ? (
+                    <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+                      Not enough active posting data yet.
+                    </p>
                   ) : (
-                    <>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                        {resumeSkills.map((skill) => (
-                          <span
-                            key={skill}
-                            style={{
-                              padding: "0.25rem 0.625rem",
-                              background: "var(--accent-faint)",
-                              color: "var(--accent)",
-                              borderRadius: "999px",
-                              fontSize: "0.8125rem",
-                              fontWeight: 500,
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      {trendingSkills.slice(0, 6).map((skill, index) => (
+                        <div
+                          key={skill.skillId}
+                          style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "0.75rem",
+                              padding: "0.5rem 0",
+                              borderBottom: index < Math.min(trendingSkills.length, 6) - 1 ? "1px solid var(--border)" : "none",
                             }}
-                          >
-                            {skill}
+                        >
+                          <span style={{ fontSize: "0.875rem", color: "var(--ink-2)" }}>{skill.skillName}</span>
+                          <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", flexShrink: 0 }}>
+                            {skill.score.toFixed(1)}
                           </span>
-                        ))}
-                      </div>
-                      {skillCount !== null && skillCount > resumeSkills.length && (
-                        <p style={{ marginTop: "0.625rem", fontSize: "0.75rem", color: "var(--ink-muted)" }}>
-                          +{skillCount - resumeSkills.length} more on your profile
-                        </p>
-                      )}
-                    </>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </Card>
               </section>
 
-              {/* Quick links */}
-              <section>
-                <h2 style={{ fontSize: "1.0625rem", marginBottom: "0.875rem" }}>Quick links</h2>
-                <Card padded={false}>
-                  {[
-                    { to: "/seeker/matches", label: "View job matches" },
-                    { to: "/seeker/applications", label: "My applications" },
-                    { to: "/seeker/profile", label: "Profile and resume" },
-                    { to: "/jobs", label: "Browse all open roles" },
-                  ].map((link, idx, arr) => (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "0.75rem 1.25rem",
-                        borderBottom: idx < arr.length - 1 ? "1px solid var(--border)" : "none",
-                        color: "var(--ink-2)",
-                        fontSize: "0.9375rem",
-                        fontWeight: 500,
-                        textDecoration: "none",
-                        transition: "background 0.12s",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.background = "var(--bg-subtle)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-                      }}
-                    >
-                      <span>{link.label}</span>
-                      <span style={{ color: "var(--ink-faint)", fontSize: "0.875rem" }}>›</span>
-                    </Link>
-                  ))}
-                </Card>
-              </section>
             </div>
           </div>
         </>
