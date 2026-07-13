@@ -13,6 +13,7 @@ import type { EducationRequirement, JobDetail, JobStatus } from "../api/employer
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Divider, Input, Spinner } from "../components/ui";
 import JobSkillsEditor from "../components/JobSkillsEditor";
+import PageLoader from "../components/PageLoader";
 
 type Props = {
   mode: "create" | "edit";
@@ -133,6 +134,10 @@ export default function JobEditor({ mode }: Props) {
   }, [isCreate, jobId]);
 
   const header = useMemo(() => (isCreate ? "Create job" : "Edit job"), [isCreate]);
+
+  useEffect(() => {
+    document.title = isCreate ? "Create Job - JobVault" : "Edit Job - JobVault";
+  }, [isCreate]);
 
   // ── Sync job state into form fields after lifecycle actions ──────────────
   const applyJobToForm = (detail: JobDetail) => {
@@ -262,7 +267,7 @@ export default function JobEditor({ mode }: Props) {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       <div
         style={{
           display: "flex",
@@ -292,9 +297,7 @@ export default function JobEditor({ mode }: Props) {
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : error && !job ? (
         <Alert tone={error.includes("session") ? "info" : "error"}>{error}</Alert>
       ) : (

@@ -8,6 +8,8 @@ import {
 import type { CandidateMatchItem, JobDetail } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, ScoreBar, Spinner } from "../components/ui";
+import PageLoader from "../components/PageLoader";
+import { formatScore } from "../utils/score";
 
 function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
@@ -77,6 +79,10 @@ export default function CandidateMatches() {
   };
 
   useEffect(() => {
+    document.title = "Candidate Matches - JobVault";
+  }, []);
+
+  useEffect(() => {
     void loadMatches();
   }, [jobId, page]);
 
@@ -100,7 +106,7 @@ export default function CandidateMatches() {
   };
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", marginBottom: "1.5rem" }}>
         <div>
           <Link to="/employer" style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
@@ -115,9 +121,7 @@ export default function CandidateMatches() {
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : error ? (
         <Alert tone={error.includes("job") ? "info" : "error"}>{error}</Alert>
       ) : (
@@ -170,7 +174,7 @@ export default function CandidateMatches() {
                         </div>
                       </div>
                       <div style={{ flexShrink: 0, fontFamily: "var(--font-display)", fontSize: "1.35rem", fontWeight: 700, color: scoreColor(item.score) }}>
-                        {Math.round(item.score * 100)}%
+                        {formatScore(item.score)}
                       </div>
                     </div>
 
@@ -223,7 +227,7 @@ export default function CandidateMatches() {
                   </p>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0.75rem", borderRadius: "var(--radius-sm)", background: "var(--bg-subtle)" }}>
                     <span style={{ fontFamily: "var(--font-display)", fontSize: "1.6rem", fontWeight: 700, color: scoreColor(selected.score) }}>
-                      {Math.round(selected.score * 100)}%
+                      {formatScore(selected.score)}
                     </span>
                     <span style={{ color: "var(--ink-muted)" }}>overall fit</span>
                   </div>

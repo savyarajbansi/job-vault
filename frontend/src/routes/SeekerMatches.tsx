@@ -4,9 +4,6 @@ import {
   getSeekerMatches,
   getSeekerSkillGaps,
   getMyApplications,
-  applyToJob,
-  draftApplication,
-  withdrawApplication,
 } from "../api/seeker";
 import type {
   SeekerJobMatchResponse,
@@ -14,9 +11,12 @@ import type {
   SeekerApplicationItem,
 } from "../api/seeker";
 import { formatSalaryRange, EDUCATION_LABELS } from "../api/employer";
-import type { ApplicationStatus } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Button, Alert, Card, Badge, Spinner, ScoreBar, Icon } from "../components/ui";
+import ApplicationStatusBadge from "../components/ApplicationStatusBadge";
+import PageLoader from "../components/PageLoader";
+import useApplicationAction from "../hooks/useApplicationAction";
+import { formatScore } from "../utils/score";
 
 const MATCHES_PER_PAGE = 10;
 
@@ -24,35 +24,6 @@ function scoreColor(score: number): string {
   if (score >= 0.7) return "var(--success)";
   if (score >= 0.4) return "#B07D20";
   return "var(--ink-muted)";
-}
-
-function applicationBadgeTone(status: ApplicationStatus): "neutral" | "success" | "warn" | "accent" {
-  if (status === "ACCEPTED") return "success";
-  if (status === "REJECTED" || status === "WITHDRAWN") return "warn";
-  if (status === "SUBMITTED" || status === "UNDER_REVIEW") return "accent";
-  return "neutral"; // DRAFT
-}
-
-function applicationStatusLabel(status: ApplicationStatus): string {
-  const map: Record<ApplicationStatus, string> = {
-    DRAFT: "Draft saved",
-    SUBMITTED: "Applied",
-    UNDER_REVIEW: "Under review",
-    ACCEPTED: "Accepted",
-    REJECTED: "Not selected",
-    WITHDRAWN: "Withdrawn",
-  };
-  return map[status];
-}
-
-function describeApplicationActionError(error: unknown): string {
-  if (error instanceof Error && error.message.includes("ERR_AUTH_003")) {
-    return "Your session has ended. Please sign in again.";
-  }
-  if (error instanceof ApiResponseError && error.response.status === 409) {
-    return "This application has already moved on — refreshing the latest status.";
-  }
-  return "That action didn't go through. Please try again.";
 }
 
 export default function SeekerMatches() {
@@ -67,10 +38,6 @@ export default function SeekerMatches() {
   const [gapsError, setGapsError] = useState<string | null>(null);
 
   const [applicationsByJobId, setApplicationsByJobId] = useState<Record<string, SeekerApplicationItem>>({});
-  const [applicationActionState, setApplicationActionState] = useState<
-    "idle" | "drafting" | "applying" | "withdrawing"
-  >("idle");
-  const [applicationActionError, setApplicationActionError] = useState<string | null>(null);
 
   const loadApplications = useCallback(async (): Promise<boolean> => {
     try {
@@ -131,11 +98,6 @@ export default function SeekerMatches() {
     void loadApplications();
   }, [loadApplications]);
 
-  useEffect(() => {
-    if (selected) void loadGaps(selected.jobId);
-    setApplicationActionError(null);
-  }, [selected]);
-
   const total = matches?.page.total ?? 0;
   const totalPages = Math.ceil(total / MATCHES_PER_PAGE);
   const hasNextPage =
@@ -145,38 +107,20 @@ export default function SeekerMatches() {
     : null;
   const selectedApplication = selected ? applicationsByJobId[selected.jobId] : undefined;
 
-  const runApplicationAction = async (action: "draft" | "apply" | "withdraw") => {
-    if (!selected) return;
-    setApplicationActionError(null);
-    setApplicationActionState(
-      action === "draft" ? "drafting" : action === "apply" ? "applying" : "withdrawing"
-    );
-    try {
-      if (action === "draft") {
-        await draftApplication(selected.jobId);
-      } else if (action === "apply") {
-        await applyToJob(selected.jobId);
-      } else if (selectedApplication) {
-        await withdrawApplication(selectedApplication.id);
-      }
-      const applicationsReloaded = await loadApplications();
-      if (!applicationsReloaded) {
-        setApplicationActionError(
-          "Your application was updated, but we couldn't refresh the latest application status."
-        );
-      }
-    } catch (err) {
-      setApplicationActionError(describeApplicationActionError(err));
-      const applicationsReloaded = await loadApplications();
-      if (!applicationsReloaded) {
-        setApplicationActionError(
-          `${describeApplicationActionError(err)} We also couldn't refresh your latest application status.`
-        );
-      }
-    } finally {
-      setApplicationActionState("idle");
-    }
-  };
+  const { actionState, actionError, clearActionError, runAction } = useApplicationAction({
+    jobId: selected?.jobId,
+    application: selectedApplication,
+    reloadApplications: loadApplications,
+  });
+
+  useEffect(() => {
+    if (selected) void loadGaps(selected.jobId);
+    clearActionError();
+  }, [selected, clearActionError]);
+
+  useEffect(() => {
+    document.title = "Job Matches - JobVault";
+  }, []);
 
   return (
     <main className="page seeker-page">
@@ -194,9 +138,7 @@ export default function SeekerMatches() {
       )}
 
       {loading && (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       )}
 
       {!loading && !error && matches && (
@@ -242,9 +184,7 @@ export default function SeekerMatches() {
                       )}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
                         {existingApplication && (
-                          <Badge tone={applicationBadgeTone(existingApplication.status)}>
-                            {applicationStatusLabel(existingApplication.status)}
-                          </Badge>
+                          <ApplicationStatusBadge status={existingApplication.status} />
                         )}
                         {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
                         {item.job.remoteEligible && (
@@ -267,7 +207,7 @@ export default function SeekerMatches() {
                         flexShrink: 0,
                       }}
                     >
-                      {Math.round(item.score * 100)}%
+                      {formatScore(item.score)}
                     </div>
                   </div>
                 </button>
@@ -305,7 +245,15 @@ export default function SeekerMatches() {
           </div>
 
           {/* ── Detail panel ── */}
-          <div className="seeker-matches__detail" style={{ position: "sticky", top: 72 }}>
+          <div
+            className="seeker-matches__detail"
+            style={{
+              position: "sticky",
+              top: 72,
+              maxHeight: "calc(100vh - 88px)",
+              overflowY: "auto",
+            }}
+          >
             {selected ? (
               <Card style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 {/* Header */}
@@ -349,7 +297,7 @@ export default function SeekerMatches() {
                         color: scoreColor(selected.score),
                       }}
                     >
-                      {Math.round(selected.score * 100)}%
+                      {formatScore(selected.score)}
                     </span>
                     <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>overall fit</span>
                   </div>
@@ -366,7 +314,7 @@ export default function SeekerMatches() {
                     borderRadius: "var(--radius-sm)",
                   }}
                 >
-                  {applicationActionError && <Alert tone="error">{applicationActionError}</Alert>}
+                  {actionError && <Alert tone="error">{actionError}</Alert>}
 
                   {!selectedApplication && (
                     <>
@@ -376,18 +324,18 @@ export default function SeekerMatches() {
                       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         <Button
                           size="sm"
-                          loading={applicationActionState === "applying"}
-                          disabled={applicationActionState !== "idle"}
-                          onClick={() => void runApplicationAction("apply")}
+                          loading={actionState === "applying"}
+                          disabled={actionState !== "idle"}
+                          onClick={() => void runAction("apply")}
                         >
                           Apply now
                         </Button>
                         <Button
                           size="sm"
                           variant="secondary"
-                          loading={applicationActionState === "drafting"}
-                          disabled={applicationActionState !== "idle"}
-                          onClick={() => void runApplicationAction("draft")}
+                          loading={actionState === "drafting"}
+                          disabled={actionState !== "idle"}
+                          onClick={() => void runAction("draft")}
                         >
                           Save as draft
                         </Button>
@@ -398,16 +346,16 @@ export default function SeekerMatches() {
                   {selectedApplication && selectedApplication.status === "DRAFT" && (
                     <>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Badge tone="neutral">Draft saved</Badge>
+                        <ApplicationStatusBadge status={selectedApplication.status} />
                         <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
                           Not yet submitted to the employer.
                         </span>
                       </div>
                       <Button
                         size="sm"
-                        loading={applicationActionState === "applying"}
-                        disabled={applicationActionState !== "idle"}
-                        onClick={() => void runApplicationAction("apply")}
+                        loading={actionState === "applying"}
+                        disabled={actionState !== "idle"}
+                        onClick={() => void runAction("apply")}
                       >
                         Submit application
                       </Button>
@@ -419,16 +367,14 @@ export default function SeekerMatches() {
                       selectedApplication.status === "UNDER_REVIEW") && (
                       <>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <Badge tone={applicationBadgeTone(selectedApplication.status)}>
-                            {applicationStatusLabel(selectedApplication.status)}
-                          </Badge>
+                          <ApplicationStatusBadge status={selectedApplication.status} />
                         </div>
                         <Button
                           size="sm"
                           variant="secondary"
-                          loading={applicationActionState === "withdrawing"}
-                          disabled={applicationActionState !== "idle"}
-                          onClick={() => void runApplicationAction("withdraw")}
+                          loading={actionState === "withdrawing"}
+                          disabled={actionState !== "idle"}
+                          onClick={() => void runAction("withdraw")}
                         >
                           Withdraw application
                         </Button>
@@ -440,9 +386,7 @@ export default function SeekerMatches() {
                       selectedApplication.status === "REJECTED" ||
                       selectedApplication.status === "WITHDRAWN") && (
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Badge tone={applicationBadgeTone(selectedApplication.status)}>
-                          {applicationStatusLabel(selectedApplication.status)}
-                        </Badge>
+                        <ApplicationStatusBadge status={selectedApplication.status} />
                         <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
                           This application is closed.
                         </span>

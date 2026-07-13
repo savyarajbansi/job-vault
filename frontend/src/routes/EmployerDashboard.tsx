@@ -11,6 +11,7 @@ import {
 import type { JobDetail, JobStatus, JobSummary } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
+import PageLoader from "../components/PageLoader";
 
 function statusTone(status: JobStatus): "neutral" | "success" | "warn" {
   if (status === "ACTIVE") return "success";
@@ -85,6 +86,10 @@ export default function EmployerDashboard() {
   };
 
   useEffect(() => {
+    document.title = "Employer Dashboard - JobVault";
+  }, []);
+
+  useEffect(() => {
     void loadJobs();
   }, []);
 
@@ -120,7 +125,7 @@ export default function EmployerDashboard() {
   };
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       {/* ── Page header ── */}
       <div
         style={{
@@ -161,9 +166,7 @@ export default function EmployerDashboard() {
       )}
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : jobs.length === 0 ? (
         <div
           style={{
@@ -344,7 +347,7 @@ export default function EmployerDashboard() {
                     style={{
                       display: "flex",
                       flexWrap: "wrap",
-                      gap: "0.75rem",
+                      gap: "1.5rem",
                       marginTop: "1rem",
                     }}
                   >

@@ -9,6 +9,8 @@ import type { TrendingSkill } from "../api/jobs";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Card, Spinner } from "../components/ui";
 import { useAuth } from "../api/authContext";
+import PageLoader from "../components/PageLoader";
+import { formatScore } from "../utils/score";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
@@ -102,7 +104,7 @@ function StatCard({
 
 function MatchCard({ item }: { item: SeekerMatchItem }) {
   const salaryLabel = formatSalaryRange(item.job.salaryMin, item.job.salaryMax);
-  const pct = Math.round(item.score * 100);
+  const pct = formatScore(item.score);
 
   return (
     <Link to={`/jobs/${item.jobId}`} style={{ textDecoration: "none" }}>
@@ -146,16 +148,13 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           <span
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "1rem",
+              fontSize: "var(--text-base)",
               fontWeight: 700,
               lineHeight: 1,
               color: scoreColor(item.score),
             }}
           >
             {pct}
-          </span>
-          <span style={{ fontSize: "0.5625rem", color: "var(--ink-faint)", letterSpacing: "0.04em" }}>
-            %
           </span>
         </div>
 
@@ -164,7 +163,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           <div
             style={{
               fontWeight: 600,
-              fontSize: "0.9375rem",
+              fontSize: "var(--text-base)",
               color: "var(--ink)",
               marginBottom: "0.125rem",
               overflow: "hidden",
@@ -175,7 +174,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
             {item.job.title}
           </div>
           {item.job.companyName && (
-            <div style={{ fontSize: "0.8125rem", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.35rem" }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--ink-2)", fontWeight: 500, marginBottom: "0.35rem" }}>
               {item.job.companyName}
             </div>
           )}
@@ -226,6 +225,10 @@ export default function SeekerDashboard() {
       status: ApplicationStatus;
     }[]
   >([]);
+
+  useEffect(() => {
+    document.title = "Dashboard - JobVault";
+  }, []);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -322,9 +325,7 @@ export default function SeekerDashboard() {
       </div>
 
       {dataLoading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : (
         <>
           {/* Stats row */}
@@ -335,13 +336,8 @@ export default function SeekerDashboard() {
             <StatCard
               label="Resume"
               value={resumeStatus ?? "—"}
-              sub={
-                skillCount != null && skillCount > 0
-                  ? `${skillCount} skills detected`
-                  : "Upload on Profile page"
-              }
+              sub={`${skillCount ?? 0} skills detected`}
             />
-            <StatCard label="Skills detected" value={skillCount ?? 0} sub="from your resume" />
           </div>
 
           {/* No resume prompt */}
@@ -397,7 +393,7 @@ export default function SeekerDashboard() {
                 )}
 
                 {matchItems.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--gap-md)" }}>
                     {matchItems.map((item) => (
                       <MatchCard key={item.jobId} item={item} />
                     ))}

@@ -5,11 +5,15 @@ import { Button } from "../components/ui";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, roles } = useAuth();
+  const isEmployer = roles.includes("EMPLOYER");
 
   useEffect(() => {
-    if (isAuthenticated) navigate("/seeker", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (!isAuthenticated) {
+      return;
+    }
+    navigate(isEmployer ? "/employer" : "/seeker", { replace: true });
+  }, [isAuthenticated, isEmployer, navigate]);
 
   return (
     <>

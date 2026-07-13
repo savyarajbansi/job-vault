@@ -1,4 +1,5 @@
 import { authorizedRequest } from "./auth";
+import { scoreToBackendScale } from "../utils/score";
 
 export type JobStatus = "DRAFT" | "ACTIVE" | "DISABLED";
 
@@ -235,7 +236,7 @@ export async function notifyEmployerCandidate(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seekerId, score: score * 100 }),
+      body: JSON.stringify({ seekerId, score: scoreToBackendScale(score) }),
     }
   );
 }

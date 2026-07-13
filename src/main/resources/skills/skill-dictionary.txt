@@ -1,9 +1,6 @@
 # Canonical skill and optional synonyms separated by pipes.
 java|java 8|java 11|java 17|java 24|java 25
-java|java 8|java 11|java 17
-spring|spring framework
-spring boot|springboot|spring-boot
-spring boot|springboot
+spring|spring framework|spring boot|springboot|spring-boot
 sql|postgres|postgresql|mysql
 javascript|js
 typescript|ts

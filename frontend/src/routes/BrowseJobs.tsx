@@ -7,6 +7,7 @@ import { formatSalaryRange } from "../api/employer";
 import type { JobSummary } from "../api/employer";
 import { useAuth } from "../api/authContext";
 import { Alert, Badge, Card, Input, Spinner } from "../components/ui";
+import PageLoader from "../components/PageLoader";
 
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -96,6 +97,10 @@ export default function BrowseJobs() {
   const [trendingLoading, setTrendingLoading] = useState(true);
 
   useEffect(() => {
+    document.title = "Browse Jobs - JobVault";
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
@@ -151,7 +156,7 @@ export default function BrowseJobs() {
   const isSeeker = isAuthenticated && roles.includes("JOB_SEEKER");
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ marginBottom: "0.375rem" }}>Open positions</h1>
         <p style={{ color: "var(--ink-muted)" }}>
@@ -192,9 +197,7 @@ export default function BrowseJobs() {
           {error && <Alert tone="error">{error}</Alert>}
 
           {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-              <Spinner size={32} />
-            </div>
+            <PageLoader />
           ) : !error && filteredJobs.length === 0 ? (
             <Card>
               <p style={{ color: "var(--ink-muted)" }}>

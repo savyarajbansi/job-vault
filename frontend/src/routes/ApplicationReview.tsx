@@ -8,6 +8,7 @@ import {
 import type { JobApplication, JobDetail } from "../api/employer";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
+import PageLoader from "../components/PageLoader";
 
 function statusTone(status: JobApplication["status"]): "neutral" | "success" | "warn" | "accent" {
   if (status === "ACCEPTED") return "success";
@@ -84,6 +85,10 @@ export default function ApplicationReview() {
   };
 
   useEffect(() => {
+    document.title = "Application Review - JobVault";
+  }, []);
+
+  useEffect(() => {
     void loadApplications();
   }, [jobId, refreshKey]);
 
@@ -111,7 +116,7 @@ export default function ApplicationReview() {
   };
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "1rem", marginBottom: "1.5rem" }}>
         <div>
           <Link to="/employer" style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
@@ -135,73 +140,80 @@ export default function ApplicationReview() {
       )}
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : error ? null : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
-          {([
-            ["draft", lanes.draft],
-            ["submitted", lanes.submitted],
-            ["under-review", lanes.underReview],
-            ["decided", lanes.decided],
-          ] as const).map(([laneId, laneItems]) => (
-            <section key={laneId} aria-label={laneLabel(laneId)}>
-              <Card>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "1rem" }}>
-                  <h2 style={{ fontSize: "1.05rem", margin: 0 }}>{laneLabel(laneId)}</h2>
-                  <Badge tone="neutral">{laneItems.length}</Badge>
-                </div>
+        <div style={{ marginTop: "1.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "1rem",
+              alignItems: "start",
+            }}
+          >
+            {([
+              ["draft", lanes.draft],
+              ["submitted", lanes.submitted],
+              ["under-review", lanes.underReview],
+              ["decided", lanes.decided],
+            ] as const).map(([laneId, laneItems]) => (
+              <section key={laneId} aria-label={laneLabel(laneId)}>
+                <Card>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "1rem" }}>
+                    <h2 style={{ fontSize: "1.05rem", margin: 0 }}>{laneLabel(laneId)}</h2>
+                    <Badge tone="neutral">{laneItems.length}</Badge>
+                  </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {laneItems.length === 0 ? (
-                    <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>No applications here.</p>
-                  ) : (
-                    laneItems.map((application) => (
-                      <article
-                        key={application.id}
-                        style={{
-                          border: "1px solid var(--border)",
-                          borderRadius: "var(--radius-sm)",
-                          padding: "0.85rem",
-                          background: "var(--bg-card)",
-                          display: "grid",
-                          gap: "0.75rem",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
-                          <div>
-                            <Badge tone={statusTone(application.status)}>{application.status}</Badge>
-                            <p style={{ marginTop: "0.55rem", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
-                              {application.seekerName ?? `Candidate ${application.seekerId.slice(0, 8)}…`}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    {laneItems.length === 0 ? (
+                      <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>No applications here.</p>
+                    ) : (
+                      laneItems.map((application) => (
+                        <article
+                          key={application.id}
+                          style={{
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            padding: "0.85rem",
+                            background: "var(--bg-card)",
+                            display: "grid",
+                            gap: "0.75rem",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
+                            <div>
+                              <Badge tone={statusTone(application.status)}>{application.status}</Badge>
+                              <p style={{ marginTop: "0.55rem", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+                                {application.seekerName ?? `Candidate ${application.seekerId.slice(0, 8)}…`}
+                              </p>
+                            </div>
+                            <span style={{ color: "var(--ink-muted)", fontSize: "0.75rem" }}>{formatDate(application.submittedAt)}</span>
+                          </div>
+
+                          {laneId === "draft" ? (
+                            <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
+                              Saved by the candidate - not yet submitted.
                             </p>
-                          </div>
-                          <span style={{ color: "var(--ink-muted)", fontSize: "0.75rem" }}>{formatDate(application.submittedAt)}</span>
-                        </div>
-
-                        {laneId === "draft" ? (
-                          <p style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
-                            Saved by the candidate — not yet submitted.
-                          </p>
-                        ) : application.status === "SUBMITTED" ? (
-                          <Button loading={busyId === application.id} variant="secondary" size="sm" onClick={() => void changeStatus(application.id, "UNDER_REVIEW")}>Move to Under Review</Button>
-                        ) : application.status === "UNDER_REVIEW" ? (
-                          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                            <Button loading={busyId === application.id} size="sm" onClick={() => void changeStatus(application.id, "ACCEPTED")}>Accept</Button>
-                            <Button loading={busyId === application.id} size="sm" variant="secondary" onClick={() => void changeStatus(application.id, "REJECTED")}>Reject</Button>
-                          </div>
-                        ) : (
-                          <div style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
-                            {application.status === "ACCEPTED" ? "Accepted" : application.status === "REJECTED" ? "Rejected" : "Withdrawn"} on {formatDate(application.decidedAt ?? application.reviewedAt)}
-                          </div>
-                        )}
-                      </article>
-                    ))
-                  )}
-                </div>
-              </Card>
-            </section>
-          ))}
+                          ) : application.status === "SUBMITTED" ? (
+                            <Button loading={busyId === application.id} variant="secondary" size="sm" onClick={() => void changeStatus(application.id, "UNDER_REVIEW")}>Move to Under Review</Button>
+                          ) : application.status === "UNDER_REVIEW" ? (
+                            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                              <Button loading={busyId === application.id} size="sm" onClick={() => void changeStatus(application.id, "ACCEPTED")}>Accept</Button>
+                              <Button loading={busyId === application.id} size="sm" variant="secondary" onClick={() => void changeStatus(application.id, "REJECTED")}>Reject</Button>
+                            </div>
+                          ) : (
+                            <div style={{ color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
+                              {application.status === "ACCEPTED" ? "Accepted" : application.status === "REJECTED" ? "Rejected" : "Withdrawn"} on {formatDate(application.decidedAt ?? application.reviewedAt)}
+                            </div>
+                          )}
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </Card>
+              </section>
+            ))}
+          </div>
         </div>
       )}
 

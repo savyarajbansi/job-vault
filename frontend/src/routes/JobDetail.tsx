@@ -13,6 +13,7 @@ import { useAuth } from "../api/authContext";
 import { Alert, Badge, Button, Card, Divider, Spinner } from "../components/ui";
 import JobSkillsEditor from "../components/JobSkillsEditor";
 import JobApplyPanel from "../components/JobApplyPanel";
+import PageLoader from "../components/PageLoader";
 
 function statusTone(status: JobDetailData["status"]): "neutral" | "success" | "warn" {
   if (status === "ACTIVE") return "success";
@@ -86,6 +87,12 @@ export default function JobDetailPage() {
     };
   }, [jobId, isSessionReady, isEmployerViewer]);
 
+  useEffect(() => {
+    if (job?.title) {
+      document.title = `${job.title} - JobVault`;
+    }
+  }, [job]);
+
   const salaryLabel = job ? formatSalaryRange(job.salaryMin, job.salaryMax) : null;
   const backHref = owned
     ? "/employer"
@@ -94,7 +101,7 @@ export default function JobDetailPage() {
       : "/jobs";
 
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
+    <main style={{ maxWidth: "var(--page-max-width)", margin: "0 auto", padding: "2rem 1.5rem 3rem" }}>
       <div style={{ marginBottom: "1.5rem" }}>
         <Link to={backHref} style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
           ← Back
@@ -102,9 +109,7 @@ export default function JobDetailPage() {
       </div>
 
       {loading || !isSessionReady ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : error || !job ? (
         <Alert tone="error">{error ?? "This job could not be found."}</Alert>
       ) : (

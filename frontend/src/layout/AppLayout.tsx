@@ -167,9 +167,10 @@ function NotificationBell() {
           style={{
             position: "absolute",
             right: 0,
+            left: "auto",
             top: "calc(100% + 0.6rem)",
             width: 360,
-            maxWidth: "calc(100vw - 2rem)",
+            maxWidth: "min(360px, calc(100vw - 2rem))",
             zIndex: 120,
             boxShadow: "var(--shadow-lg)",
           }}
@@ -324,7 +325,7 @@ export default function AppLayout() {
       >
         <div
           style={{
-            maxWidth: 1100,
+            maxWidth: "var(--page-max-width)",
             margin: "0 auto",
             padding: "0 1.5rem",
             height: 56,
@@ -369,7 +370,7 @@ export default function AppLayout() {
               <>
                 {isEmployer ? (
                   <>
-                    <NavLink to="/employer" className="nav-link">
+                    <NavLink to="/employer" end className="nav-link">
                       Dashboard
                     </NavLink>
                     <NavLink to="/employer/jobs/new" className="nav-link">

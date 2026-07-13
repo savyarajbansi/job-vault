@@ -4,6 +4,7 @@ import { getMyApplications, withdrawApplication } from "../api/seeker";
 import type { SeekerApplicationItem } from "../api/seeker";
 import type { ApplicationStatus } from "../api/employer";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
+import PageLoader from "../components/PageLoader";
 
 function statusTone(status: ApplicationStatus): "neutral" | "success" | "warn" | "accent" {
   if (status === "ACCEPTED") return "success";
@@ -63,6 +64,10 @@ export default function SeekerApplications() {
   };
 
   useEffect(() => {
+    document.title = "My Applications - JobVault";
+  }, []);
+
+  useEffect(() => {
     void load();
   }, []);
 
@@ -103,9 +108,7 @@ export default function SeekerApplications() {
       )}
 
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : items.length === 0 ? (
         <Card>
           <p style={{ color: "var(--ink-muted)", marginBottom: "1rem" }}>

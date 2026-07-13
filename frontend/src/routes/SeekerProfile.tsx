@@ -30,6 +30,7 @@ import {
   SectionHeader,
   Spinner,
 } from "../components/ui";
+import PageLoader from "../components/PageLoader";
 
 function resumeStatusTone(status: string): "success" | "warn" | "neutral" | "accent" {
   if (status === "PARSED") return "success";
@@ -850,6 +851,10 @@ export default function SeekerProfile() {
   };
 
   useEffect(() => {
+    document.title = "Profile - JobVault";
+  }, []);
+
+  useEffect(() => {
     void loadProfile();
     void loadHistory();
   }, []);
@@ -897,9 +902,7 @@ export default function SeekerProfile() {
       )}
 
       {isLoading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}>
-          <Spinner size={32} />
-        </div>
+        <PageLoader />
       ) : (
         <div className="seeker-profile__content">
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
