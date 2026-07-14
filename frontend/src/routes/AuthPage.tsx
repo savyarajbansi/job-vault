@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, type SVGProps } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../api/authContext";
 import { ApiResponseError } from "../api/client";
@@ -39,6 +39,28 @@ function parseFieldErrors(payload: unknown): FieldErrors {
   }
   const msg = (p["message"] as string) ?? "Something went wrong.";
   return { general: msg };
+}
+
+function JobSeekerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <circle cx="11" cy="8" r="3" />
+      <path d="M5 19c.7-3.4 3.1-5.5 6-5.5s5.3 2.1 6 5.5" />
+      <path d="M16.5 11.5 20 15" />
+      <path d="M20 11.5v3.5h-3.5" />
+    </svg>
+  );
+}
+
+function EmployerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M4 20V7h16v13" />
+      <path d="M7 7V5.5A1.5 1.5 0 0 1 8.5 4h7A1.5 1.5 0 0 1 17 5.5V7" />
+      <path d="M8 12h8" />
+      <path d="M8 16h5" />
+    </svg>
+  );
 }
 
 export default function AuthPage() {
@@ -122,6 +144,13 @@ export default function AuthPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
         .auth-card { animation: fadeUp 0.45s cubic-bezier(0.16,1,0.3,1) both; }
+        .auth-shell {
+          min-height: calc(100dvh - 56px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem;
+        }
         .tab-btn {
           flex: 1;
           padding: 0.625rem 1rem;
@@ -142,7 +171,7 @@ export default function AuthPage() {
         .tab-btn:hover:not(.active) { color: var(--ink); }
         .role-card {
           flex: 1;
-          padding: 0.875rem 1rem;
+          padding: 0.875rem 0.9375rem;
           border: 1.5px solid var(--border);
           border-radius: var(--radius-sm);
           background: transparent;
@@ -150,41 +179,58 @@ export default function AuthPage() {
           text-align: left;
           transition: border-color 0.15s, background 0.15s;
           display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
+          align-items: flex-start;
+          gap: 0.75rem;
           font-family: var(--font-body);
+          min-width: 0;
+        }
+        .role-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.75rem;
+        }
+        .role-icon {
+          width: 2.25rem;
+          height: 2.25rem;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--accent);
+          background: var(--accent-faint);
+        }
+        .role-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 0.2rem;
+          min-width: 0;
         }
         .role-card.selected {
           border-color: var(--accent);
           background: var(--accent-faint);
         }
         .role-card:hover:not(.selected) { border-color: var(--ink-muted); }
+        @media (max-width: 560px) {
+          .auth-shell {
+            align-items: flex-start;
+            padding-top: 0.75rem;
+            padding-bottom: 1rem;
+          }
+          .role-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
 
       {!isSessionReady ? (
-        <div
-          style={{
-            minHeight: "calc(100vh - 56px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "2rem 1rem",
-          }}
-        >
+        <div className="auth-shell">
           <Spinner size={28} />
         </div>
       ) : (
-      <div
-        style={{
-          minHeight: "calc(100vh - 56px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "2rem 1rem",
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 440 }}>
-          <div style={{ textAlign: "center", marginBottom: "2rem" }} className="auth-card">
+      <div className="auth-shell">
+        <div style={{ width: "100%", maxWidth: 480 }}>
+          <div style={{ textAlign: "center", marginBottom: "1.25rem" }} className="auth-card">
             <h1 style={{ marginBottom: "0.5rem" }}>
               {tab === "signin" ? "Welcome back" : "Create an account"}
             </h1>
@@ -211,10 +257,10 @@ export default function AuthPage() {
               </button>
             </div>
 
-            <div style={{ padding: "1.75rem" }}>
+            <div style={{ padding: "1.25rem 1.25rem 1.375rem" }}>
               {tab === "signin" && (
                 <form onSubmit={(e) => void handleSignIn(e)} noValidate>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
                     {siErrors.general && <Alert tone="error">{siErrors.general}</Alert>}
                     <Input
                       label="Email address"
@@ -245,7 +291,7 @@ export default function AuthPage() {
 
               {tab === "register" && (
                 <form onSubmit={(e) => void handleRegister(e)} noValidate>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
                     {regErrors.general && <Alert tone="error">{regErrors.general}</Alert>}
                     <Input
                       label="Full name"
@@ -281,16 +327,17 @@ export default function AuthPage() {
                       <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)", letterSpacing: "0.02em" }}>
                         I am a…
                       </span>
-                      <div style={{ display: "flex", gap: "0.75rem" }}>
+                      <div className="role-grid">
                         <button
                           type="button"
                           className={`role-card ${regRole === "JOB_SEEKER" ? "selected" : ""}`}
                           onClick={() => setRegRole("JOB_SEEKER")}
                         >
-                          <span style={{ fontSize: "1.25rem" }}>🔍</span>
-                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Job Seeker</span>
-                          <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
-                            Find opportunities that match your skills
+                          <span className="role-icon">
+                            <JobSeekerIcon width={16} height={16} />
+                          </span>
+                          <span className="role-copy">
+                            <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Job Seeker</span>
                           </span>
                         </button>
                         <button
@@ -298,15 +345,16 @@ export default function AuthPage() {
                           className={`role-card ${regRole === "EMPLOYER" ? "selected" : ""}`}
                           onClick={() => setRegRole("EMPLOYER")}
                         >
-                          <span style={{ fontSize: "1.25rem" }}>🏢</span>
-                          <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Employer</span>
-                          <span style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
-                            Post jobs and discover candidates
+                          <span className="role-icon">
+                            <EmployerIcon width={16} height={16} />
+                          </span>
+                          <span className="role-copy">
+                            <span style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--ink)" }}>Employer</span>
                           </span>
                         </button>
                       </div>
                     </div>
-                    <Button type="submit" fullWidth loading={regLoading} size="lg" style={{ marginTop: "0.25rem" }}>
+                    <Button type="submit" fullWidth loading={regLoading} size="lg" style={{ marginTop: "0.125rem" }}>
                       Create account
                     </Button>
                   </div>
@@ -315,7 +363,7 @@ export default function AuthPage() {
             </div>
           </Card>
 
-          <p style={{ textAlign: "center", marginTop: "1.25rem", fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+          <p style={{ textAlign: "center", marginTop: "0.875rem", fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
             By continuing you agree to our terms of service and privacy policy.
           </p>
         </div>

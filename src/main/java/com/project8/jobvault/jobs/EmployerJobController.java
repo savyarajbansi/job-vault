@@ -1,7 +1,7 @@
 package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
-import com.project8.jobvault.matching.CorpusIdfService;
+import com.project8.jobvault.matching.CorpusRebuildEventPublisher;
 import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.skills.SkillRepository;
 import com.project8.jobvault.users.UserAccount;
@@ -34,7 +34,7 @@ public class EmployerJobController {
     private final UserAccountRepository userAccountRepository;
     private final ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider;
     private final ObjectProvider<SkillRepository> skillRepositoryProvider;
-    private final CorpusIdfService corpusIdfService;
+    private final CorpusRebuildEventPublisher corpusRebuildEventPublisher;
     private final Clock clock;
 
     public EmployerJobController(
@@ -42,13 +42,13 @@ public class EmployerJobController {
             UserAccountRepository userAccountRepository,
             ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider,
             ObjectProvider<SkillRepository> skillRepositoryProvider,
-            CorpusIdfService corpusIdfService,
+            CorpusRebuildEventPublisher corpusRebuildEventPublisher,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
         this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
         this.skillRepositoryProvider = skillRepositoryProvider;
-        this.corpusIdfService = corpusIdfService;
+        this.corpusRebuildEventPublisher = corpusRebuildEventPublisher;
         this.clock = clock;
     }
 
@@ -79,10 +79,9 @@ public class EmployerJobController {
         job.setEducationRequirement(request.educationRequirement());
         job.setStatus(JobStatus.DRAFT);
         Job saved = jobRepository.save(job);
-        // Populate auto-detected skills immediately so a brand-new job isn't
-        // sitting with an empty skill set until the employer happens to save again.
         syncRequiredSkills(saved);
-        refreshIdfCorpus();
+        // Publish async post-commit event — response returns immediately.
+        corpusRebuildEventPublisher.publishRebuild("job-created");
         Job withSkills = jobRepository.findById(saved.getId()).orElse(saved);
         return ResponseEntity.status(HttpStatus.CREATED).body(toDetail(withSkills));
     }
@@ -123,7 +122,7 @@ public class EmployerJobController {
         job.setEducationRequirement(request.educationRequirement());
         Job saved = jobRepository.save(job);
         syncRequiredSkills(saved);
-        refreshIdfCorpus();
+        corpusRebuildEventPublisher.publishRebuild("job-updated");
         Job withSkills = jobRepository.findById(saved.getId()).orElse(saved);
         return ResponseEntity.ok(toDetail(withSkills));
     }
@@ -140,7 +139,7 @@ public class EmployerJobController {
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
-        refreshIdfCorpus();
+        corpusRebuildEventPublisher.publishRebuild("job-published");
         Job withSkills = findOwned(jobId, employer.getId()).orElse(saved);
         return ResponseEntity.ok(toDetail(withSkills));
     }
@@ -157,7 +156,7 @@ public class EmployerJobController {
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         syncRequiredSkills(saved);
-        refreshIdfCorpus();
+        corpusRebuildEventPublisher.publishRebuild("job-disabled");
         Job withSkills = findOwned(jobId, employer.getId()).orElse(saved);
         return ResponseEntity.ok(toDetail(withSkills));
     }
@@ -173,7 +172,7 @@ public class EmployerJobController {
         }
         Job saved = findOwned(jobId, employer.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
-        refreshIdfCorpus();
+        corpusRebuildEventPublisher.publishRebuild("job-reactivated");
         return ResponseEntity.ok(toDetail(saved));
     }
 
@@ -271,10 +270,6 @@ public class EmployerJobController {
 
     private void syncRequiredSkills(Job job) {
         jobRequiredSkillSyncServiceProvider.ifAvailable(service -> service.syncRequiredSkills(job));
-    }
-
-    private void refreshIdfCorpus() {
-        corpusIdfService.rebuildFromRepository();
     }
 
     private JobSummaryResponse toSummary(Job job) {

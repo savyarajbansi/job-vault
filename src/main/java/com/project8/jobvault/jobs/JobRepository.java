@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,11 +14,26 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface JobRepository extends JpaRepository<Job, UUID> {
+
+    // ── Public / match queries ─────────────────────────────────────────────────
+
+    /** Unbounded list used only for corpus building (all descriptions needed). */
     List<Job> findAllByStatusOrderByCreatedAtDesc(JobStatus status);
+
+    /**
+     * Paginated active-job query for use in matching facades.
+     * Callers should pass a {@link Pageable} with a reasonable page size
+     * (e.g. 500) so that memory pressure is bounded as the job catalogue grows.
+     */
+    Page<Job> findAllByStatus(JobStatus status, Pageable pageable);
+
+    // ── Employer queries ───────────────────────────────────────────────────────
 
     List<Job> findAllByEmployerIdOrderByCreatedAtDesc(UUID employerId);
 
     Optional<Job> findByIdAndStatus(UUID id, JobStatus status);
+
+    // ── Admin moderation mutations ─────────────────────────────────────────────
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -57,6 +74,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             @Param("moderatedBy") UserAccount moderatedBy,
             @Param("moderatedAt") Instant moderatedAt,
             @Param("disabledAt") Instant disabledAt);
+
+    // ── Employer lifecycle mutations ───────────────────────────────────────────
 
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
