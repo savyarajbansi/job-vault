@@ -17,6 +17,24 @@ function scoreColor(score: number): string {
   return "var(--ink-muted)";
 }
 
+function MatchFactorBar({
+  value,
+  available,
+  label,
+}: {
+  value: number;
+  available: boolean;
+  label: string;
+}) {
+  return available ? (
+    <ScoreBar value={value} label={label} />
+  ) : (
+    <div style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+      {label}: <span style={{ color: "var(--ink-faint)" }}>Not applicable</span>
+    </div>
+  );
+}
+
 function truncateId(value: string): string {
   return value.length <= 8 ? value : `${value.slice(0, 8)}…`;
 }
@@ -94,7 +112,7 @@ export default function CandidateMatches() {
     }
     setNotificationState((current) => ({ ...current, [item.seekerId]: "loading" }));
     try {
-      const response = await notifyEmployerCandidate(jobId, item.seekerId, item.score);
+      const response = await notifyEmployerCandidate(jobId, item.seekerId);
       setNotificationState((current) => ({
         ...current,
         [item.seekerId]: response.notified ? "notified" : "below",
@@ -234,10 +252,10 @@ export default function CandidateMatches() {
                 </div>
 
                 <div style={{ display: "grid", gap: "0.75rem" }}>
-                  <ScoreBar value={selected.factors.cosine} label="Content similarity" />
-                  <ScoreBar value={selected.factors.skillsOverlap} label="Skills overlap" />
-                  <ScoreBar value={selected.factors.experience} label="Experience" />
-                  <ScoreBar value={selected.factors.location} label="Location" />
+                  <MatchFactorBar value={selected.factors.cosine} available={selected.factors.cosineAvailable} label="Content similarity" />
+                  <MatchFactorBar value={selected.factors.skillsOverlap} available={selected.factors.skillsAvailable} label="Skills overlap" />
+                  <MatchFactorBar value={selected.factors.experience} available={selected.factors.experienceAvailable} label="Experience" />
+                  <MatchFactorBar value={selected.factors.location} available={selected.factors.locationAvailable} label="Location" />
                 </div>
 
                 <div>

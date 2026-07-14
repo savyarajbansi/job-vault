@@ -58,7 +58,7 @@ public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyn
             managed.setRequiredSkills(required);
         }
         for (String inferred : skillCatalog.extractSkills(managed.getDescription())) {
-            String normalized = inferred == null ? "" : inferred.trim();
+            String normalized = skillCatalog.canonicalize(inferred);
             if (normalized.isEmpty()) {
                 continue;
             }

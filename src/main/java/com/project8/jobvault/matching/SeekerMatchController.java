@@ -3,6 +3,7 @@ package com.project8.jobvault.matching;
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.ratelimit.RateLimitService;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
@@ -21,12 +22,15 @@ import org.springframework.http.HttpStatus;
 public class SeekerMatchController {
     private final UserAccountRepository userAccountRepository;
     private final ObjectProvider<MatchingFacade> matchingFacadeProvider;
+    private final RateLimitService rateLimitService;
 
     public SeekerMatchController(
             UserAccountRepository userAccountRepository,
-            ObjectProvider<MatchingFacade> matchingFacadeProvider) {
+            ObjectProvider<MatchingFacade> matchingFacadeProvider,
+            RateLimitService rateLimitService) {
         this.userAccountRepository = userAccountRepository;
         this.matchingFacadeProvider = matchingFacadeProvider;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/matches/jobs")
@@ -35,6 +39,8 @@ public class SeekerMatchController {
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         UserAccount seeker = requireUser(principal);
+        MatchPagination.validate(limit, offset);
+        rateLimitService.checkMatch(seeker.getId());
         return ResponseEntity.ok(requireFacade().seekerMatches(seeker, limit, offset));
     }
 
@@ -43,6 +49,7 @@ public class SeekerMatchController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
         UserAccount seeker = requireUser(principal);
+        rateLimitService.checkMatch(seeker.getId());
         return ResponseEntity.ok(requireFacade().seekerSkillGap(seeker, jobId));
     }
 

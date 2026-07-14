@@ -32,6 +32,10 @@ export type MatchFactors = {
   skillsOverlap: number;
   experience: number;
   location: number;
+  cosineAvailable: boolean;
+  skillsAvailable: boolean;
+  experienceAvailable: boolean;
+  locationAvailable: boolean;
 };
 
 // Mirrors SeekerJobMatchResponse.JobInfo on the backend. Keep in sync with

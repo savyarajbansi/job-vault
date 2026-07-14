@@ -26,6 +26,24 @@ function scoreColor(score: number): string {
   return "var(--ink-muted)";
 }
 
+function MatchFactorBar({
+  value,
+  available,
+  label,
+}: {
+  value: number;
+  available: boolean;
+  label: string;
+}) {
+  return available ? (
+    <ScoreBar value={value} label={label} />
+  ) : (
+    <div style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+      {label}: <span style={{ color: "var(--ink-faint)" }}>Not applicable</span>
+    </div>
+  );
+}
+
 export default function SeekerMatches() {
   const [matches, setMatches] = useState<SeekerJobMatchResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,7 +146,7 @@ export default function SeekerMatches() {
         <div className="page-header__copy">
           <h1>Job Matches</h1>
           <p className="page-header__subtitle">
-            Ranked by fit based on your resume, skills, experience, and preferences.
+            Ranked by resume content, required skills, experience, and location when those signals are available.
           </p>
         </div>
       </div>
@@ -399,10 +417,10 @@ export default function SeekerMatches() {
                   <h4 style={{ fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-muted)", marginBottom: "0.125rem" }}>
                     Match factors
                   </h4>
-                  <ScoreBar value={selected.factors.cosine} label="Content similarity" />
-                  <ScoreBar value={selected.factors.skillsOverlap} label="Skills overlap" />
-                  <ScoreBar value={selected.factors.experience} label="Experience" />
-                  <ScoreBar value={selected.factors.location} label="Location" />
+                  <MatchFactorBar value={selected.factors.cosine} available={selected.factors.cosineAvailable} label="Content similarity" />
+                  <MatchFactorBar value={selected.factors.skillsOverlap} available={selected.factors.skillsAvailable} label="Skills overlap" />
+                  <MatchFactorBar value={selected.factors.experience} available={selected.factors.experienceAvailable} label="Experience" />
+                  <MatchFactorBar value={selected.factors.location} available={selected.factors.locationAvailable} label="Location" />
                 </div>
 
                 {/* Required skills */}

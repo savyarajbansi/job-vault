@@ -1,5 +1,4 @@
 import { authorizedRequest } from "./auth";
-import { scoreToBackendScale } from "../utils/score";
 
 export type JobStatus = "DRAFT" | "ACTIVE" | "DISABLED";
 
@@ -67,6 +66,10 @@ export type MatchFactorBreakdown = {
   skillsOverlap: number;
   experience: number;
   location: number;
+  cosineAvailable: boolean;
+  skillsAvailable: boolean;
+  experienceAvailable: boolean;
+  locationAvailable: boolean;
 };
 
 export type CandidateMatchItem = {
@@ -228,15 +231,14 @@ export async function getEmployerCandidateMatches(
  */
 export async function notifyEmployerCandidate(
   jobId: string,
-  seekerId: string,
-  score: number
+  seekerId: string
 ): Promise<CandidateMatchNotificationResponse> {
   return authorizedRequest<CandidateMatchNotificationResponse>(
     `/api/employer/jobs/${jobId}/matches`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seekerId, score: scoreToBackendScale(score) }),
+      body: JSON.stringify({ seekerId }),
     }
   );
 }

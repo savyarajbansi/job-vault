@@ -8,10 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import jakarta.annotation.PreDestroy;
@@ -36,19 +39,35 @@ public class PdfResumeParser implements ResumeParser {
             @Value("${jobvault.parsing.max-pages}") int maxPages,
             @Value("${jobvault.parsing.max-text-bytes}") int maxTextBytes,
             @Value("${jobvault.parsing.timeout-seconds}") long timeoutSeconds,
-            SkillCatalog skillCatalog) {
-        this(maxPages, maxTextBytes, Duration.ofSeconds(timeoutSeconds), skillCatalog);
+            SkillCatalog skillCatalog,
+            @Value("${jobvault.parsing.max-queue-depth:20}") int maxQueueDepth) {
+        this(maxPages, maxTextBytes, Duration.ofSeconds(timeoutSeconds), skillCatalog, maxQueueDepth);
     }
 
     public PdfResumeParser(int maxPages, int maxTextBytes, Duration timeout, SkillCatalog skillCatalog) {
+        this(maxPages, maxTextBytes, timeout, skillCatalog, 20);
+    }
+
+    public PdfResumeParser(
+            int maxPages, int maxTextBytes, Duration timeout, SkillCatalog skillCatalog, int maxQueueDepth) {
         this.maxPages = requirePositive(maxPages, "maxPages");
         this.maxTextBytes = requirePositive(maxTextBytes, "maxTextBytes");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
         if (timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
+        if (maxQueueDepth <= 0) {
+            throw new IllegalArgumentException("maxQueueDepth must be positive");
+        }
         this.skillCatalog = Objects.requireNonNull(skillCatalog, "skillCatalog");
-        this.parserExecutor = Executors.newSingleThreadExecutor(new ParserThreadFactory());
+        this.parserExecutor = new ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(maxQueueDepth),
+                new ParserThreadFactory(),
+                new ThreadPoolExecutor.AbortPolicy());
     }
 
     @Override
@@ -78,6 +97,12 @@ public class PdfResumeParser implements ResumeParser {
         try {
             future = parserExecutor.submit(() -> extractText(pdfBytes));
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new ParseErrorException(
+                    ParseErrorCodes.PARSE_QUEUE_FULL,
+                    ParseErrorCodes.MESSAGE_PARSE_QUEUE_FULL,
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    Map.of("reason", "queue_full"));
         } catch (TimeoutException ex) {
             if (future != null) {
                 future.cancel(true);

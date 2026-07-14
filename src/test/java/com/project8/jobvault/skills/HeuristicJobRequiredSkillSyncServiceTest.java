@@ -41,13 +41,13 @@ class HeuristicJobRequiredSkillSyncServiceTest {
         when(skillCatalog.extractSkills(job.getDescription())).thenReturn(List.of("java", "spring"));
         when(skillRepository.findByNameIgnoreCase("java")).thenReturn(Optional.empty());
         when(skillRepository.findByNameIgnoreCase("spring")).thenReturn(Optional.empty());
-        when(skillRepository.save(argThat(skill -> "java".equals(skill.getName()))))
+        when(skillRepository.save(argThat(skill -> skill != null && "java".equals(skill.getName()))))
                 .thenAnswer(invocation -> {
                     Skill created = invocation.getArgument(0);
                     created.setId(UUID.randomUUID());
                     return created;
                 });
-        when(skillRepository.save(argThat(skill -> "spring".equals(skill.getName()))))
+        when(skillRepository.save(argThat(skill -> skill != null && "spring".equals(skill.getName()))))
                 .thenAnswer(invocation -> {
                     Skill created = invocation.getArgument(0);
                     created.setId(UUID.randomUUID());

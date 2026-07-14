@@ -2,6 +2,7 @@ package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.matching.CorpusRebuildEventPublisher;
+import com.project8.jobvault.parsing.SkillCatalog;
 import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.skills.SkillRepository;
 import com.project8.jobvault.users.UserAccount;
@@ -36,6 +37,7 @@ public class EmployerJobController {
     private final ObjectProvider<SkillRepository> skillRepositoryProvider;
     private final CorpusRebuildEventPublisher corpusRebuildEventPublisher;
     private final Clock clock;
+    private final SkillCatalog skillCatalog;
 
     public EmployerJobController(
             JobRepository jobRepository,
@@ -43,13 +45,15 @@ public class EmployerJobController {
             ObjectProvider<JobRequiredSkillSyncService> jobRequiredSkillSyncServiceProvider,
             ObjectProvider<SkillRepository> skillRepositoryProvider,
             CorpusRebuildEventPublisher corpusRebuildEventPublisher,
-            Clock clock) {
+            Clock clock,
+            SkillCatalog skillCatalog) {
         this.jobRepository = jobRepository;
         this.userAccountRepository = userAccountRepository;
         this.jobRequiredSkillSyncServiceProvider = jobRequiredSkillSyncServiceProvider;
         this.skillRepositoryProvider = skillRepositoryProvider;
         this.corpusRebuildEventPublisher = corpusRebuildEventPublisher;
         this.clock = clock;
+        this.skillCatalog = skillCatalog;
     }
 
     @GetMapping
@@ -184,7 +188,7 @@ public class EmployerJobController {
         UserAccount employer = requireUser(principal);
         Objects.requireNonNull(request, "request");
         Job job = requireEditableOwnedJob(jobId, employer.getId());
-        String normalized = request.name().trim();
+        String normalized = skillCatalog.canonicalize(request.name());
         if (normalized.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Skill name is required");
         }

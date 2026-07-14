@@ -54,6 +54,16 @@ function formError(error: unknown): string {
   if (error instanceof ApiResponseError && error.response.status === 409) {
     return "This job is disabled. Reactivate it to make edits.";
   }
+  if (error instanceof ApiResponseError && error.code === "ERR_VALIDATION_001") {
+    const fields = error.details?.fields;
+    if (fields && typeof fields === "object") {
+      const first = Object.values(fields as Record<string, unknown>).find(
+        (value): value is string => typeof value === "string" && value.length > 0
+      );
+      if (first) return first;
+    }
+    return "Please check the job fields and try again.";
+  }
   return "Could not save the job. Please try again.";
 }
 
@@ -74,7 +84,7 @@ export default function JobEditor({ mode }: Props) {
   const [description, setDescription] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("");
-  const [remoteEligible, setRemoteEligible] = useState(false);
+  const [remoteEligible, setRemoteEligible] = useState<boolean | null>(null);
   const [minExperienceYears, setMinExperienceYears] = useState("");
 
   // New fields
@@ -107,7 +117,7 @@ export default function JobEditor({ mode }: Props) {
         setDescription(detail.description);
         setCompanyName(detail.companyName ?? "");
         setLocation(detail.location ?? "");
-        setRemoteEligible(Boolean(detail.remoteEligible));
+        setRemoteEligible(detail.remoteEligible);
         setMinExperienceYears(
           detail.minExperienceYears == null ? "" : String(detail.minExperienceYears)
         );
@@ -146,7 +156,7 @@ export default function JobEditor({ mode }: Props) {
     setDescription(detail.description);
     setCompanyName(detail.companyName ?? "");
     setLocation(detail.location ?? "");
-    setRemoteEligible(Boolean(detail.remoteEligible));
+    setRemoteEligible(detail.remoteEligible);
     setMinExperienceYears(
       detail.minExperienceYears == null ? "" : String(detail.minExperienceYears)
     );
@@ -377,23 +387,18 @@ export default function JobEditor({ mode }: Props) {
                 placeholder="Chicago, IL"
               />
 
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  fontSize: "0.9375rem",
-                  color: "var(--ink-2)",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={remoteEligible}
-                  onChange={(e) => setRemoteEligible(e.target.checked)}
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.375rem", fontSize: "0.875rem", color: "var(--ink-2)" }}>
+                Remote eligibility
+                <select
+                  value={remoteEligible == null ? "" : String(remoteEligible)}
+                  onChange={(e) => setRemoteEligible(e.target.value === "" ? null : e.target.value === "true")}
                   disabled={isDisabled}
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                Remote eligible
+                  style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}
+                >
+                  <option value="">Not specified</option>
+                  <option value="true">Remote eligible</option>
+                  <option value="false">On-site only</option>
+                </select>
               </label>
 
               {/* ── Salary range ── */}

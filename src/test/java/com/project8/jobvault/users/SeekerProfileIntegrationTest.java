@@ -143,7 +143,7 @@ class SeekerProfileIntegrationTest {
                         }
                         """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
                 .andExpect(jsonPath("$.details.reason").value("validation_failed"))
                 .andExpect(jsonPath("$.details.fields.yearsExperience").exists());
     }

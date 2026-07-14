@@ -1,17 +1,22 @@
 # Canonical skill and optional synonyms separated by pipes.
 java|java 8|java 11|java 17|java 24|java 25
 spring|spring framework|spring boot|springboot|spring-boot
-sql|postgres|postgresql|mysql
+sql
+postgres|postgresql
+mysql
 javascript|js
 typescript|ts
 react|react.js
 python
 aws|amazon web services
-docker|kubernetes|k8s
+docker
+kubernetes|k8s
 hibernate|jpa
 rest|restful|rest api|restful api
 microservices|microservice architecture
-git|github|gitlab
+git
+github
+gitlab
 linux|unix
 html|html5
 css|css3
@@ -19,7 +24,8 @@ node.js|nodejs
 express|express.js
 next.js|nextjs
 angular|angularjs
-vue.js|vue|vuejs
+vue.js|vuejs
+vue
 redux
 tailwind css|tailwind
 bootstrap
@@ -29,8 +35,10 @@ go|golang
 rust
 c++
 c
-php|laravel
-ruby|ruby on rails|rails
+php
+laravel
+ruby
+rails|ruby on rails
 scala
 mongodb|mongo
 redis
@@ -54,7 +62,9 @@ firebase
 react native
 flutter
 android
-ios|swift|objective-c
+ios
+swift
+objective-c
 pytest|junit|unit testing
 cypress
 playwright

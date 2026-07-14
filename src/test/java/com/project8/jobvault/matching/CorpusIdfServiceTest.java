@@ -2,6 +2,7 @@ package com.project8.jobvault.matching;
 
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobRepository;
+import com.project8.jobvault.jobs.JobStatus;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -16,9 +17,9 @@ import static org.mockito.Mockito.when;
 class CorpusIdfServiceTest {
 
     @Test
-    void rebuildFromRepositoryUsesAllJobDescriptionsAsCorpus() {
+    void rebuildFromRepositoryUsesActiveJobDescriptionsAsCorpus() {
         JobRepository repository = mock(JobRepository.class);
-        when(repository.findAll()).thenReturn(List.of(
+        when(repository.findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE)).thenReturn(List.of(
                 job("Java Spring microservices"),
                 job("Java Kafka distributed systems"),
                 job("COBOL mainframe batch processing")));
@@ -33,7 +34,7 @@ class CorpusIdfServiceTest {
     @Test
     void rebuildHandlesEmptyCorpus() {
         JobRepository repository = mock(JobRepository.class);
-        when(repository.findAll()).thenReturn(List.of());
+        when(repository.findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE)).thenReturn(List.of());
 
         CorpusIdfService service = new CorpusIdfService(objectProvider(repository));
         service.rebuildFromRepository();

@@ -45,7 +45,13 @@ jobvault:
     max-pages: 20
     max-text-bytes: 2097152
     timeout-seconds: 5
+    max-queue-depth: 20
     skill-dictionary: classpath:skills/skill-dictionary.txt
+  matching:
+    idf-rebuild-interval-ms: 300000
+  ratelimit:
+    upload-per-minute: 5
+    match-per-minute: 30
   security:
     jwt:
       issuer: JobVault

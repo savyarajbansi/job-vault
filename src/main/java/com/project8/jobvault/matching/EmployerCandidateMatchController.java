@@ -3,6 +3,7 @@ package com.project8.jobvault.matching;
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.ratelimit.RateLimitService;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -21,12 +22,15 @@ import org.springframework.web.server.ResponseStatusException;
 public class EmployerCandidateMatchController {
     private final UserAccountRepository userAccountRepository;
     private final ObjectProvider<MatchingFacade> matchingFacadeProvider;
+    private final RateLimitService rateLimitService;
 
     public EmployerCandidateMatchController(
             UserAccountRepository userAccountRepository,
-            ObjectProvider<MatchingFacade> matchingFacadeProvider) {
+            ObjectProvider<MatchingFacade> matchingFacadeProvider,
+            RateLimitService rateLimitService) {
         this.userAccountRepository = userAccountRepository;
         this.matchingFacadeProvider = matchingFacadeProvider;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/{jobId}/matches/candidates")
@@ -36,6 +40,8 @@ public class EmployerCandidateMatchController {
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         UserAccount employer = requireUser(principal);
+        MatchPagination.validate(limit, offset);
+        rateLimitService.checkMatch(employer.getId());
         return ResponseEntity.ok(requireFacade().employerCandidates(employer.getId(), jobId, limit, offset));
     }
 

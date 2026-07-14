@@ -99,6 +99,10 @@ export default function AuthPage() {
       const result = await login(siEmail, siPassword);
       navigate(result.user.roles.includes("EMPLOYER") ? "/employer" : "/seeker", { replace: true });
     } catch (err) {
+      if (err instanceof ApiResponseError && err.code === "ERR_VALIDATION_001") {
+        setSiErrors(parseFieldErrors(err.payload));
+        return;
+      }
       const raw = err instanceof Error ? err.message : "";
       if (raw.includes("ERR_AUTH_002") || raw.toLowerCase().includes("invalid")) {
         setSiErrors({ general: "Incorrect email or password. Please try again." });

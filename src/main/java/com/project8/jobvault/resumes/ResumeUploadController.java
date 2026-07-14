@@ -9,6 +9,7 @@ import com.project8.jobvault.parsing.ResumeParseAttemptStatus;
 import com.project8.jobvault.parsing.ResumeParser;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
+import com.project8.jobvault.ratelimit.RateLimitService;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Clock;
@@ -47,6 +48,7 @@ public class ResumeUploadController {
     private final Clock clock;
     private final DataSize maxFileSize;
     private final ObjectProvider<ResumeParseAttemptRepository> resumeParseAttemptRepositoryProvider;
+    private final RateLimitService rateLimitService;
 
     public ResumeUploadController(
             ResumeMetadataRepository resumeMetadataRepository,
@@ -55,6 +57,7 @@ public class ResumeUploadController {
             ResumeParser resumeParser,
             Clock clock,
             ObjectProvider<ResumeParseAttemptRepository> resumeParseAttemptRepositoryProvider,
+            RateLimitService rateLimitService,
             @Value("${spring.servlet.multipart.max-file-size:10MB}") DataSize maxFileSize) {
         this.resumeMetadataRepository = resumeMetadataRepository;
         this.userAccountRepository = userAccountRepository;
@@ -62,6 +65,7 @@ public class ResumeUploadController {
         this.resumeParser = resumeParser;
         this.clock = clock;
         this.resumeParseAttemptRepositoryProvider = resumeParseAttemptRepositoryProvider;
+        this.rateLimitService = rateLimitService;
         this.maxFileSize = maxFileSize;
     }
 
@@ -94,6 +98,7 @@ public class ResumeUploadController {
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestPart("file") @NotNull MultipartFile file) {
         UserAccount seeker = requireUser(principal);
+        rateLimitService.checkUpload(seeker.getId());
         String contentType = resolvePdfContentType(file);
 
         ResumeMetadata metadata = new ResumeMetadata();

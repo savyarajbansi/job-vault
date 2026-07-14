@@ -179,7 +179,7 @@ function ProfileForm({
 }) {
   const [sector, setSector] = useState(profile.preferredSector ?? "");
   const [location, setLocation] = useState(profile.preferredLocation ?? "");
-  const [remoteOk, setRemoteOk] = useState<boolean>(profile.remoteOk ?? false);
+  const [remoteOk, setRemoteOk] = useState<boolean | null>(profile.remoteOk);
   const [yearsExperience, setYearsExperience] = useState(
     profile.yearsExperience != null ? String(profile.yearsExperience) : ""
   );
@@ -247,26 +247,20 @@ function ProfileForm({
           value={yearsExperience}
           onChange={(event) => setYearsExperience(event.target.value)}
           placeholder="e.g. 5"
-          hint="Used to match you against minimum experience requirements."
+          hint="Used when a job includes a minimum experience requirement."
         />
 
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            fontSize: "0.9375rem",
-            color: "var(--ink-2)",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={remoteOk}
-            onChange={(event) => setRemoteOk(event.target.checked)}
-            style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
-          />
-          <span>Open to remote work</span>
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.375rem", fontSize: "0.875rem", color: "var(--ink-2)" }}>
+          Remote preference
+          <select
+            value={remoteOk == null ? "" : String(remoteOk)}
+            onChange={(event) => setRemoteOk(event.target.value === "" ? null : event.target.value === "true")}
+            style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}
+          >
+            <option value="">Not specified</option>
+            <option value="true">Open to remote work</option>
+            <option value="false">Prefer on-site work</option>
+          </select>
         </label>
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
@@ -570,8 +564,8 @@ function ProfileSnapshotCard({
       {profile ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
           <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", maxWidth: "58ch" }}>
-            This is the profile employers and match scoring use. Edit only when your preferences
-            change.
+            Employers can see these preferences. Location, experience, and remote preference are
+            current matching signals; sector is retained for your profile but is not ranked yet.
           </p>
 
           <div
@@ -656,7 +650,7 @@ function ProfileSnapshotCard({
       ) : (
         <EmptyState
           title="No profile details yet"
-          description="Add your preferred sector, location, experience level, and remote preference to make your matches more accurate."
+          description="Add location, experience, and remote preference to make current matching signals more accurate."
           action={
             <Button onClick={onEdit} variant="secondary">
               <Icon name="edit" size={14} />
@@ -921,7 +915,7 @@ export default function SeekerProfile() {
                   value={
                     profile?.preferredSector
                       ? profile.preferredSector
-                      : "Set a sector so your matches are more focused."
+                      : "Not set"
                   }
                   muted={!profile?.preferredSector}
                 />
