@@ -16,7 +16,7 @@ import { Button, Alert, Card, Badge, Spinner, ScoreBar, Icon } from "../componen
 import ApplicationStatusBadge from "../components/ApplicationStatusBadge";
 import PageLoader from "../components/PageLoader";
 import useApplicationAction from "../hooks/useApplicationAction";
-import { formatScore } from "../utils/score";
+import { formatScore, isStrongMatch } from "../utils/score";
 
 const MATCHES_PER_PAGE = 10;
 
@@ -209,7 +209,7 @@ export default function SeekerMatches() {
                           <Badge tone="accent">Remote eligible</Badge>
                         )}
                         {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
-                        {item.missingSkills.length === 0 ? (
+                        {isStrongMatch(item.score) ? (
                           <Badge tone="success">Strong match</Badge>
                         ) : (
                           <Badge tone="neutral">{item.missingSkills.length} skill gaps</Badge>
@@ -477,7 +477,9 @@ export default function SeekerMatches() {
                         <Icon name="check" size={14} />
                       </span>
                       <span style={{ fontSize: "0.875rem", color: "var(--success)" }}>
-                        No skill gaps - strong match!
+                        {isStrongMatch(selected.score)
+                          ? "No skill gaps - strong match."
+                          : "No skill gaps were detected."}
                       </span>
                     </div>
                   )}

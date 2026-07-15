@@ -65,9 +65,9 @@ export default function JobSkillsEditor({ job, onUpdate }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
       <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
         Required skills drive the skills-overlap component of candidate match scores.
-        Skills mentioned in the description are detected automatically — add or remove
+        Skills mentioned in the title or description are detected automatically — add or remove
         any that need adjusting. Note: a skill that's still literally present in the
-        description text will be re-detected the next time you save the job, even if
+        posting text will be re-detected the next time you save the job, even if
         you remove it here.
       </p>
 

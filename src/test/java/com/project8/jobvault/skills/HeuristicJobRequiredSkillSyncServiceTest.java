@@ -31,6 +31,7 @@ class HeuristicJobRequiredSkillSyncServiceTest {
         UUID jobId = UUID.randomUUID();
         Job job = new TestJob();
         job.setId(jobId);
+        job.setTitle("Java developer");
         job.setDescription("We use Java and Spring.");
 
         Skill manuallyAdded = skillWithName("kubernetes");
@@ -38,7 +39,9 @@ class HeuristicJobRequiredSkillSyncServiceTest {
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
         when(jobRepository.save(job)).thenReturn(job);
-        when(skillCatalog.extractSkills(job.getDescription())).thenReturn(List.of("java", "spring"));
+        when(skillCatalog.extractSkills("Java developer\nWe use Java and Spring."))
+                .thenReturn(List.of("java", "spring"));
+        when(skillCatalog.canonicalize(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         when(skillRepository.findByNameIgnoreCase("java")).thenReturn(Optional.empty());
         when(skillRepository.findByNameIgnoreCase("spring")).thenReturn(Optional.empty());
         when(skillRepository.save(argThat(skill -> skill != null && "java".equals(skill.getName()))))
@@ -86,6 +89,42 @@ class HeuristicJobRequiredSkillSyncServiceTest {
 
         verify(jobRepository, never()).save(any());
         verify(skillCatalog, never()).extractSkills(anyString());
+    }
+
+    @Test
+    void syncDetectsSkillsFromTitleWhenDescriptionHasNoSkill() {
+        JobRepository jobRepository = mock(JobRepository.class);
+        SkillCatalog skillCatalog = mock(SkillCatalog.class);
+        SkillRepository skillRepository = mock(SkillRepository.class);
+
+        UUID jobId = UUID.randomUUID();
+        Job job = new TestJob();
+        job.setId(jobId);
+        job.setTitle("Kubernetes platform engineer");
+        job.setDescription("Join our platform team.");
+        job.setRequiredSkills(new LinkedHashSet<>());
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobRepository.save(job)).thenReturn(job);
+        when(skillCatalog.extractSkills("Kubernetes platform engineer\nJoin our platform team."))
+                .thenReturn(List.of("kubernetes"));
+        when(skillCatalog.canonicalize(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(skillRepository.findByNameIgnoreCase("kubernetes")).thenReturn(Optional.empty());
+        when(skillRepository.save(any(Skill.class))).thenAnswer(invocation -> {
+            Skill created = invocation.getArgument(0);
+            created.setId(UUID.randomUUID());
+            return created;
+        });
+
+        HeuristicJobRequiredSkillSyncService service =
+                new HeuristicJobRequiredSkillSyncService(jobRepository, skillCatalog, skillRepository);
+
+        service.syncRequiredSkills(job);
+
+        assertEquals(Set.of("kubernetes"), job.getRequiredSkills().stream()
+                .map(Skill::getName)
+                .collect(Collectors.toSet()));
+        verify(jobRepository).save(job);
     }
 
     @Test

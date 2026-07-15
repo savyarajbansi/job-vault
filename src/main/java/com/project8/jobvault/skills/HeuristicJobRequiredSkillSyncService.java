@@ -11,17 +11,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Detects skills mentioned in a job's description and adds them to the job's
- * required-skills set.
+ * Detects skills mentioned in a job's title or description and adds them to
+ * the job's required-skills set.
  *
  * <p>This is intentionally additive-only: it never removes a skill, whether
  * that skill was previously auto-detected or added manually by the employer
  * (see {@code EmployerJobController#addRequiredSkill}). That makes it safe to
  * run automatically on every save (create/update/publish/disable) without
  * ever clobbering a manually curated list. Known trade-off: manually removing
- * a skill that is still literally present in the description text will not
- * "stick" past the next save, since detection re-derives from the current
- * text every time.
+ * a skill that is still literally present in the posting text will not "stick"
+ * past the next save, since detection re-derives from the current text every
+ * time.
  */
 @Service
 @ConditionalOnBean(SkillRepository.class)
@@ -49,7 +49,13 @@ public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyn
         // caller's entity state, so this works correctly regardless of which
         // transaction (if any) the caller is in.
         Job managed = jobRepository.findById(job.getId()).orElse(null);
-        if (managed == null || managed.getDescription() == null || managed.getDescription().isBlank()) {
+        if (managed == null) {
+            return;
+        }
+        String title = managed.getTitle() == null ? "" : managed.getTitle();
+        String description = managed.getDescription() == null ? "" : managed.getDescription();
+        String postingText = title + "\n" + description;
+        if (postingText.isBlank()) {
             return;
         }
         Set<Skill> required = managed.getRequiredSkills();
@@ -57,7 +63,7 @@ public class HeuristicJobRequiredSkillSyncService implements JobRequiredSkillSyn
             required = new LinkedHashSet<>();
             managed.setRequiredSkills(required);
         }
-        for (String inferred : skillCatalog.extractSkills(managed.getDescription())) {
+        for (String inferred : skillCatalog.extractSkills(postingText)) {
             String normalized = skillCatalog.canonicalize(inferred);
             if (normalized.isEmpty()) {
                 continue;

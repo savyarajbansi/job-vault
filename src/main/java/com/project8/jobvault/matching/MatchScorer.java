@@ -15,8 +15,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class MatchScorer {
     static final double COSINE_WEIGHT = 0.4;
-    static final double SKILL_WEIGHT = 0.3;
-    static final double EXPERIENCE_WEIGHT = 0.2;
+    static final double SKILL_WEIGHT = 0.35;
+    static final double EXPERIENCE_WEIGHT = 0.15;
     static final double LOCATION_WEIGHT = 0.1;
 
     private final CorpusIdfService corpusIdfService;

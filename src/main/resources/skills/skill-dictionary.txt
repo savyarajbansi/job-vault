@@ -1,6 +1,7 @@
 # Canonical skill and optional synonyms separated by pipes.
 java|java 8|java 11|java 17|java 24|java 25
-spring|spring framework|spring boot|springboot|spring-boot
+spring|spring framework
+spring boot|springboot|spring-boot
 sql
 postgres|postgresql
 mysql
@@ -65,14 +66,141 @@ android
 ios
 swift
 objective-c
-pytest|junit|unit testing
+pytest
+junit
+unit testing
 cypress
 playwright
 selenium
-agile|scrum|kanban
+agile
+scrum
+kanban
 data structures
 algorithms
 machine learning|ml
 nlp|natural language processing
 data analysis|pandas|numpy
 tableau|power bi
+FastAPI|fast api
+nest.js|nestjs|nest js
+seo
+Fastify
+SQLite
+MariaDB|maria db
+Svelte
+SSO
+SAML
+OWASP
+npm
+DDD|Domain-Driven Design
+Mockito
+Helm
+UI/UX
+Maven
+gradle
+caching
+Jest
+leadership
+communication
+mentorship
+ownership
+problem solving
+Kotlin
+WebSockets|web sockets
+Swagger
+e2e testing
+RAG
+PyTorch
+thymeleaf
+intellij idea
+eclipse
+netbeans
+vs code
+jsp
+waterfall
+soap
+Performance Optimization|Performance Tuning
+JavaFX
+oop|object oriented programming
+Oracle
+Mercurial
+MVC
+serverless
+time management
+Multi-threading|Multi threading
+Celery
+RBAC
+CodeIgniter
+Symfony
+Jira
+IPCore
+MPLS
+IPRAN
+conflict resolution
+Appium
+WebDriver
+Pinecone
+postman
+Weaviate
+pgvector
+LangChain
+LlamaIndex
+ec2
+S3
+Wireshark
+Nmap
+Metasploit
+OWASP
+SIEM
+IDS
+EDR
+log analysis
+NIST
+CIS
+CVE
+MITRE ATT&CK
+JMeter
+k6
+Rancher
+debugging
+Grafana
+Prometheus
+PySpark
+Databricks
+MLOps
+LLMOps
+Kinesis
+Hive
+HDFS
+Hadoop
+Pentaho
+Snowflake Schema
+Snowflake
+Star Schema
+data warehousing
+shell scripting
+project management
+Analytical
+TensorFlow
+security testing
+Route53
+CloudFront
+VPC
+IAM
+Prisma
+TypeORM
+Kimball
+Airflow
+Prefect
+ClickHouse
+Fivetran
+ETL/ELT
+PeerDB
+Airbyte
+Looker
+IaC
+DataHub
+Great Expectations
+SQLAlchemy
+Tortoise
+API security

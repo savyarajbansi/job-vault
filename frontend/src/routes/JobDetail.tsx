@@ -11,7 +11,6 @@ import { getPublicJob } from "../api/jobs";
 import { ApiResponseError } from "../api/client";
 import { useAuth } from "../api/authContext";
 import { Alert, Badge, Button, Card, Divider, Spinner } from "../components/ui";
-import JobSkillsEditor from "../components/JobSkillsEditor";
 import JobApplyPanel from "../components/JobApplyPanel";
 import PageLoader from "../components/PageLoader";
 
@@ -203,9 +202,7 @@ export default function JobDetailPage() {
 
           <Divider label="Required skills" />
           <div style={{ marginTop: "1rem" }}>
-            {owned ? (
-              <JobSkillsEditor job={job} onUpdate={setJob} />
-            ) : job.requiredSkills.length === 0 ? (
+            {job.requiredSkills.length === 0 ? (
               <p style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>
                 No specific skills were listed for this role.
               </p>

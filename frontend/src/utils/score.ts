@@ -1,7 +1,14 @@
+/** Minimum raw 0.0-1.0 score required for a "Strong match" label. */
+export const STRONG_MATCH_THRESHOLD = 0.7;
+
 function clamp01(value: number): number {
   if (value < 0) return 0;
   if (value > 1) return 1;
   return value;
+}
+
+export function isStrongMatch(score: number): boolean {
+  return score >= STRONG_MATCH_THRESHOLD;
 }
 
 /** Converts a 0.0-1.0 score to a display percentage string, e.g. "73%" */

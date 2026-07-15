@@ -10,7 +10,7 @@ import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Card, Spinner } from "../components/ui";
 import { useAuth } from "../api/authContext";
 import PageLoader from "../components/PageLoader";
-import { formatScore } from "../utils/score";
+import { formatScore, isStrongMatch } from "../utils/score";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
@@ -183,7 +183,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
             {item.job.remoteEligible && <Badge tone="accent">Remote</Badge>}
             {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
             <Badge tone={scoreTone(item.score)}>
-              {item.missingSkills.length === 0
+              {isStrongMatch(item.score)
                 ? "Strong match"
                 : `${item.missingSkills.length} gap${item.missingSkills.length !== 1 ? "s" : ""}`}
             </Badge>
