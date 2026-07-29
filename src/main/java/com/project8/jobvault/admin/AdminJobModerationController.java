@@ -1,6 +1,7 @@
 package com.project8.jobvault.admin;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.matching.MatchingPreferences;
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobDetailResponse;
 import com.project8.jobvault.jobs.JobModerationAction;
@@ -143,8 +144,9 @@ public class AdminJobModerationController {
                 job.getTitle(),
                 job.getDescription(),
                 job.getCompanyName(),
+                MatchingPreferences.parseSectors(job.getSectorTags()),
                 job.getLocation(),
-                job.getRemoteEligible(),
+                job.getWorkMode(),
                 job.getMinExperienceYears(),
                 job.getSalaryMin(),
                 job.getSalaryMax(),

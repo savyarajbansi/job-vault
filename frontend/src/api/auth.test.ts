@@ -282,7 +282,7 @@ describe("auth persistence and refresh recovery", () => {
     await expect(spawnedDuringDrain).resolves.toEqual({ id: "u-1", roles: ["EMPLOYER"] });
   });
 
-  it("rejects non-idempotent request with ERR_AUTH_003 after refresh success", async () => {
+  it("retries a write request after refreshing an expired access token", async () => {
     globalThis.localStorage.setItem(ACCESS_TOKEN_KEY, "token-old");
 
     const fetchMock = vi
@@ -295,7 +295,8 @@ describe("auth persistence and refresh recovery", () => {
           refreshTokenExpiresAt: "2026-04-20T23:59:00Z",
           user: { id: "u-1", roles: ["EMPLOYER"] }
         })
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { id: "job-1" }));
 
     Object.defineProperty(globalThis, "fetch", {
       value: fetchMock,
@@ -305,18 +306,17 @@ describe("auth persistence and refresh recovery", () => {
 
     const auth = await import("./auth");
 
-    await expect(
-      auth.authorizedRequest("/api/employer/jobs", {
+    await expect(auth.authorizedRequest("/api/employer/jobs", {
         method: "POST",
         body: JSON.stringify({ title: "Role" }),
         headers: { "Content-Type": "application/json" }
-      })
-    ).rejects.toThrow(/ERR_AUTH_003/);
+      })).resolves.toEqual({ id: "job-1" });
 
     const postRetries = fetchMock.mock.calls.filter(
       ([input]) => callUrl(input as RequestInfo | URL) === "/api/employer/jobs"
     );
-    expect(postRetries).toHaveLength(1);
+    expect(postRetries).toHaveLength(2);
+    expect(callHeader(postRetries[1]?.[1] as RequestInit, "Authorization")).toBe("Bearer token-new");
   });
 
   it("clears auth and rejects queued requests when refresh fails", async () => {

@@ -1,4 +1,5 @@
 import { authorizedRequest } from "./auth";
+import type { SectorCode, WorkMode } from "./matching";
 
 export type JobStatus = "DRAFT" | "ACTIVE" | "DISABLED";
 
@@ -19,8 +20,9 @@ export type JobSummary = {
   id: string;
   title: string;
   companyName: string | null;
+  sectorTags: SectorCode[];
   location: string | null;
-  remoteEligible: boolean | null;
+  workMode: WorkMode | null;
   minExperienceYears: number | null;
   salaryMin: number | null;
   salaryMax: number | null;
@@ -33,8 +35,9 @@ export type JobDetail = {
   title: string;
   description: string;
   companyName: string | null;
+  sectorTags: SectorCode[];
   location: string | null;
-  remoteEligible: boolean | null;
+  workMode: WorkMode | null;
   minExperienceYears: number | null;
   salaryMin: number | null;
   salaryMax: number | null;
@@ -51,8 +54,9 @@ export type JobCreateRequest = {
   title: string;
   description: string;
   companyName?: string | null;
+  sectorTags?: SectorCode[] | null;
   location?: string | null;
-  remoteEligible?: boolean | null;
+  workMode?: WorkMode | null;
   minExperienceYears?: number | null;
   salaryMin?: number | null;
   salaryMax?: number | null;
@@ -79,6 +83,7 @@ export type CandidateMatchItem = {
   score: number;
   factors: MatchFactorBreakdown;
   missingSkills: string[];
+  shortlistStatus: "PENDING" | "ACCEPTED" | null;
 };
 
 export type MatchPage = {
@@ -94,6 +99,8 @@ export type CandidateMatchResponse = {
 
 export type CandidateMatchNotificationResponse = {
   notified: boolean;
+  shortlistId: string | null;
+  status: "PENDING" | "ACCEPTED" | null;
 };
 
 export type ApplicationStatus =

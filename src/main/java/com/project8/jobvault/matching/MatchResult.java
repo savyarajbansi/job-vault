@@ -47,6 +47,9 @@ public class MatchResult {
     @Column(name = "location_score", nullable = false)
     private double locationScore;
 
+    @Column(name = "sector_score", nullable = false)
+    private double sectorScore;
+
     @Column(name = "cosine_available", nullable = false)
     private boolean cosineAvailable;
 
@@ -58,6 +61,9 @@ public class MatchResult {
 
     @Column(name = "location_available", nullable = false)
     private boolean locationAvailable;
+
+    @Column(name = "sector_available", nullable = false)
+    private boolean sectorAvailable;
 
     @Column(name = "missing_skills", nullable = false, columnDefinition = "text")
     private String missingSkills = "";
@@ -152,6 +158,14 @@ public class MatchResult {
         this.locationScore = locationScore;
     }
 
+    public double getSectorScore() {
+        return sectorScore;
+    }
+
+    public void setSectorScore(double sectorScore) {
+        this.sectorScore = sectorScore;
+    }
+
     public boolean isCosineAvailable() {
         return cosineAvailable;
     }
@@ -182,6 +196,14 @@ public class MatchResult {
 
     public void setLocationAvailable(boolean locationAvailable) {
         this.locationAvailable = locationAvailable;
+    }
+
+    public boolean isSectorAvailable() {
+        return sectorAvailable;
+    }
+
+    public void setSectorAvailable(boolean sectorAvailable) {
+        this.sectorAvailable = sectorAvailable;
     }
 
     public String getMissingSkills() {

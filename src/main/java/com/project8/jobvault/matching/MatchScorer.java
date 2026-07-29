@@ -1,6 +1,7 @@
 package com.project8.jobvault.matching;
 
 import com.project8.jobvault.jobs.Job;
+import com.project8.jobvault.matching.WorkMode;
 import com.project8.jobvault.parsing.SkillCatalog;
 import com.project8.jobvault.resumes.ResumeMetadata;
 import com.project8.jobvault.users.UserAccount;
@@ -14,8 +15,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MatchScorer {
-    static final double COSINE_WEIGHT = 0.4;
-    static final double SKILL_WEIGHT = 0.35;
+    static final double COSINE_WEIGHT = 0.35;
+    static final double SKILL_WEIGHT = 0.3;
     static final double EXPERIENCE_WEIGHT = 0.15;
     static final double LOCATION_WEIGHT = 0.1;
 
@@ -56,7 +57,6 @@ public class MatchScorer {
 
         ExperienceResult experience = experienceScore(seeker, job);
         LocationResult location = locationScore(seeker, job);
-
         double weightedTotal = 0.0;
         double activeWeight = 0.0;
         if (cosineAvailable) {
@@ -75,7 +75,6 @@ public class MatchScorer {
             weightedTotal += location.value() * LOCATION_WEIGHT;
             activeWeight += LOCATION_WEIGHT;
         }
-
         double overall = activeWeight == 0.0 ? 0.0 : clamp01(weightedTotal / activeWeight);
         return new ScoredMatch(
                 overall,
@@ -125,50 +124,32 @@ public class MatchScorer {
         if (years <= 0) {
             return new ExperienceResult(0.0, true);
         }
-        return new ExperienceResult(clamp01((double) years / required), true);
+        if (years >= required) {
+            return new ExperienceResult(1.0, true);
+        }
+        int partialThreshold = Math.max(0, required - 1);
+        if (years < partialThreshold) {
+            return new ExperienceResult(0.0, true);
+        }
+        return new ExperienceResult(0.5, true);
     }
 
     private LocationResult locationScore(UserAccount seeker, Job job) {
-        String seekerLocation = normalizeLocation(seeker == null ? null : seeker.getPreferredLocation());
-        String jobLocation = normalizeLocation(job == null ? null : job.getLocation());
-        boolean remoteEligible = job != null && Boolean.TRUE.equals(job.getRemoteEligible());
-        Boolean remoteOk = seeker == null ? null : seeker.getRemoteOk();
-        boolean hasLocationSignal = seekerLocation != null && jobLocation != null;
-        boolean hasRemoteSignal = remoteEligible && remoteOk != null;
+        String seekerLocation = seeker == null ? null : seeker.getPreferredLocation();
+        String jobLocation = job == null ? null : job.getLocation();
+        boolean remoteEligible = job != null && job.getWorkMode() != null && job.getWorkMode() != WorkMode.ON_SITE;
+        WorkMode preference = seeker == null ? null : seeker.getWorkMode();
+        boolean hasLocationSignal = LocationNormalizer.normalize(seekerLocation) != null
+                && LocationNormalizer.normalize(jobLocation) != null;
+        boolean hasRemoteSignal = remoteEligible && preference != null;
         if (!hasLocationSignal && !hasRemoteSignal) {
             return new LocationResult(0.0, false);
         }
-        boolean matches = hasLocationSignal && locationMatches(seekerLocation, jobLocation);
-        if (remoteEligible && Boolean.TRUE.equals(remoteOk)) {
+        boolean matches = hasLocationSignal && LocationNormalizer.matches(seekerLocation, jobLocation);
+        if (remoteEligible && preference != WorkMode.ON_SITE) {
             matches = true;
         }
         return new LocationResult(matches ? 1.0 : 0.0, true);
-    }
-
-    private boolean locationMatches(String seekerLocation, String jobLocation) {
-        Set<String> seekerTokens = tokenizeLocation(seekerLocation);
-        Set<String> jobTokens = tokenizeLocation(jobLocation);
-        for (String token : seekerTokens) {
-            if (token.length() > 2 && jobTokens.contains(token)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Set<String> tokenizeLocation(String location) {
-        return Arrays.stream(location.toLowerCase(Locale.ROOT).split("[,\\s]+"))
-                .map(String::trim)
-                .filter(token -> !token.isEmpty())
-                .collect(Collectors.toSet());
-    }
-
-    private String normalizeLocation(String location) {
-        if (location == null) {
-            return null;
-        }
-        String normalized = location.trim().toLowerCase(Locale.ROOT);
-        return normalized.isEmpty() ? null : normalized;
     }
 
     private String orEmpty(String value) {
@@ -184,4 +165,5 @@ public class MatchScorer {
 
     private record LocationResult(double value, boolean available) {
     }
+
 }

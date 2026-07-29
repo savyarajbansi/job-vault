@@ -163,7 +163,7 @@ class EmployerJobListIntegrationTest {
     void listResponseIncludesExpectedFields() throws Exception {
         Job job = buildJob(employerUser, JobStatus.DRAFT, "Platform Engineer");
         job.setLocation("Kathmandu");
-        job.setRemoteEligible(true);
+        job.setWorkMode(com.project8.jobvault.matching.WorkMode.REMOTE);
         job.setMinExperienceYears(3);
         jobsById.put(job.getId(), job);
 
@@ -174,7 +174,7 @@ class EmployerJobListIntegrationTest {
                 .andExpect(jsonPath("$[0].title").value("Platform Engineer"))
                 .andExpect(jsonPath("$[0].status").value("DRAFT"))
                 .andExpect(jsonPath("$[0].location").value("Kathmandu"))
-                .andExpect(jsonPath("$[0].remoteEligible").value(true))
+                .andExpect(jsonPath("$[0].workMode").value("REMOTE"))
                 .andExpect(jsonPath("$[0].minExperienceYears").value(3));
     }
 

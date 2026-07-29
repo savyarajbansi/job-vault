@@ -1,30 +1,25 @@
 import { authorizedRequest } from "./auth";
 import type { ApplicationStatus, EducationRequirement } from "./employer";
+import { authorizedBlobRequest } from "./auth";
+import type { SectorCode, WorkMode } from "./matching";
 
 export type ResumeUploadResult = {
   resumeId: string;
   status: string;
 };
 
-export type ResumeHistoryItem = {
+export type CurrentResume = {
   resumeId: string;
   originalFilename: string;
   status: string;
-  failureCode: string | null;
-  createdAt: string;
   parsedAt: string | null;
-  inferredSkills: string[];
+  skills: string[];
 };
 
 export type MatchPage = {
   limit: number;
   offset: number;
   total: number;
-};
-
-export type ResumeHistoryResponse = {
-  items: ResumeHistoryItem[];
-  page: MatchPage;
 };
 
 export type MatchFactors = {
@@ -43,8 +38,9 @@ export type MatchFactors = {
 export type JobInfo = {
   title: string;
   companyName: string | null;
+  sectorTags: SectorCode[];
   location: string | null;
-  remoteEligible: boolean | null;
+  workMode: WorkMode | null;
   salaryMin: number | null;
   salaryMax: number | null;
   educationRequirement: EducationRequirement | null;
@@ -69,11 +65,6 @@ export type SkillGapResponse = {
   missingSkills: string[];
 };
 
-export type SeekerResumeHistoryQuery = {
-  limit: number;
-  offset: number;
-};
-
 export type SeekerMatchesQuery = {
   limit: number;
   offset: number;
@@ -81,17 +72,22 @@ export type SeekerMatchesQuery = {
 
 export type SeekerProfile = {
   userId: string;
-  preferredSector: string | null;
+  displayName: string | null;
+  email: string;
+  preferredSectors: SectorCode[];
   preferredLocation: string | null;
-  remoteOk: boolean | null;
+  workMode: WorkMode | null;
   yearsExperience: number | null;
+  resume: CurrentResume | null;
 };
 
 export type SeekerProfileUpdate = {
-  preferredSector?: string | null;
+  displayName?: string | null;
+  preferredSectors?: SectorCode[] | null;
   preferredLocation?: string | null;
-  remoteOk?: boolean | null;
+  workMode?: WorkMode | null;
   yearsExperience?: number | null;
+  skills?: string[] | null;
 };
 
 function queryString(params: Record<string, string | number | undefined>): string {
@@ -111,15 +107,6 @@ export async function uploadSeekerResume(file: File): Promise<ResumeUploadResult
     method: "POST",
     body: formData,
   });
-}
-
-export async function getSeekerResumeHistory(
-  params: SeekerResumeHistoryQuery
-): Promise<ResumeHistoryResponse> {
-  return authorizedRequest<ResumeHistoryResponse>(
-    `/api/seeker/resumes${queryString(params)}`,
-    { method: "GET" }
-  );
 }
 
 export async function getSeekerMatches(
@@ -152,6 +139,34 @@ export async function updateSeekerProfile(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+}
+
+export async function getSeekerPublicProfile(
+  seekerId: string,
+  jobId?: string
+): Promise<SeekerProfile> {
+  const query = jobId ? `?jobId=${encodeURIComponent(jobId)}` : "";
+  return authorizedRequest<SeekerProfile>(`/api/profiles/seekers/${seekerId}${query}`, {
+    method: "GET",
+  });
+}
+
+export async function getSeekerResume(
+  seekerId: string,
+  jobId: string | undefined,
+  download: boolean
+): Promise<Blob> {
+  const query = new URLSearchParams({ download: String(download) });
+  if (jobId) query.set("jobId", jobId);
+  return authorizedBlobRequest(`/api/profiles/seekers/${seekerId}/resume?${query.toString()}`);
+}
+
+export async function acceptSeekerShortlist(shortlistId: string): Promise<{
+  notified: boolean;
+  shortlistId: string;
+  status: "PENDING" | "ACCEPTED";
+}> {
+  return authorizedRequest(`/api/seeker/shortlists/${shortlistId}/accept`, { method: "POST" });
 }
 
 // Applications

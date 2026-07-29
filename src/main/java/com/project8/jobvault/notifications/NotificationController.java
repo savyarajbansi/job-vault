@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +29,7 @@ public class NotificationController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public List<NotificationResponse> list(@AuthenticationPrincipal JwtPrincipal principal) {
         UserAccount user = requireUser(principal);
         return notificationRepository.findTop20ByRecipientIdOrderByCreatedAtDesc(user.getId()).stream()
@@ -36,7 +38,17 @@ public class NotificationController {
                         notification.getType(),
                         notification.getMessage(),
                         notification.isRead(),
-                        notification.getCreatedAt()))
+                        notification.getCreatedAt(),
+                        notification.getCandidateMatchNotification() == null
+                                || notification.getCandidateMatchNotification().getJob() == null
+                                ? null
+                                : notification.getCandidateMatchNotification().getJob().getId(),
+                        notification.getCandidateMatchNotification() == null
+                                ? null
+                                : notification.getCandidateMatchNotification().getId(),
+                        notification.getCandidateMatchNotification() == null
+                                ? null
+                                : notification.getCandidateMatchNotification().getStatus()))
                 .toList();
     }
 

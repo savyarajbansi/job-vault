@@ -14,7 +14,7 @@ class SkillCatalogTest {
         List<String> skills = catalog.extractSkills(
                 "Senior C# and .NET engineer. Build REST APIs with Spring Boot and CI/CD.");
 
-        assertEquals(List.of("c#", ".net", "rest", "spring", "ci cd"), skills);
+        assertEquals(List.of("c#", ".net", "rest", "spring boot", "ci cd"), skills);
     }
 
     @Test

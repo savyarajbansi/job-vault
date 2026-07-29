@@ -21,7 +21,6 @@ const AUTH_RECOVERY_CODE = "ERR_AUTH_003";
 const AUTH_RECOVERY_MESSAGE = "Session expired. Please sign in again.";
 
 type PendingRequest = {
-  method: string;
   retry: () => Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -174,14 +173,6 @@ function markRefreshFailure(): void {
   authGeneration += 1;
 }
 
-function isIdempotent(method: string): boolean {
-  return method === "GET" || method === "HEAD";
-}
-
-function normalizeMethod(options: RequestInit): string {
-  return (options.method ?? "GET").toUpperCase();
-}
-
 function withAccessToken(options: RequestInit, token: string): RequestInit {
   const headers = new Headers(options.headers ?? undefined);
   headers.set("Authorization", `Bearer ${token}`);
@@ -207,13 +198,16 @@ async function executeAuthorizedRequest<T>(
     throwResponseError(response, payload);
   }
 
-  return enqueueForRefresh<T>(url, options, normalizeMethod(options));
+  // The API authenticates the JWT before entering a controller, so a 401 here
+  // means the write was not processed. Replay it once with the rotated token;
+  // otherwise profile and job saves are silently discarded when a token
+  // expires while the user is editing a form.
+  return enqueueForRefresh<T>(url, options);
 }
 
-function enqueueForRefresh<T>(url: string, options: RequestInit, method: string): Promise<T> {
+function enqueueForRefresh<T>(url: string, options: RequestInit): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     pendingRequests.push({
-      method,
       retry: () => executeAuthorizedRequest<T>(url, options, true),
       resolve: (value: unknown) => resolve(value as T),
       reject: (reason: unknown) => reject(reason)
@@ -247,10 +241,6 @@ async function processPendingQueue(): Promise<void> {
     const queued = pendingRequests;
     pendingRequests = [];
     for (const pending of queued) {
-      if (!isIdempotent(pending.method)) {
-        pending.reject(authRecoveryError());
-        continue;
-      }
       pending.retry().then(pending.resolve).catch(pending.reject);
     }
   } catch {
@@ -315,4 +305,21 @@ async function requestRefreshTokens(): Promise<AuthTokensResponse> {
 
 function authRecoveryError(): Error {
   return new Error(`${AUTH_RECOVERY_CODE}: ${AUTH_RECOVERY_MESSAGE}`);
+}
+
+export async function authorizedBlobRequest(url: string, afterRefreshRetry = false): Promise<Blob> {
+  const token = accessToken;
+  if (!token || loggedOut || refreshFailed) {
+    throw authRecoveryError();
+  }
+  const headers = new Headers({ Authorization: `Bearer ${token}` });
+  const response = await fetch(url, { method: "GET", headers });
+  if (response.ok) {
+    return response.blob();
+  }
+  if (response.status === 401 && !afterRefreshRetry) {
+    await ensureRefresh();
+    return authorizedBlobRequest(url, true);
+  }
+  throw new Error(`Request failed with status ${response.status}`);
 }

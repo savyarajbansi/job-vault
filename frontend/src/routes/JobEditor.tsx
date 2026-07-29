@@ -10,6 +10,8 @@ import {
   updateEmployerJob,
 } from "../api/employer";
 import type { EducationRequirement, JobDetail, JobStatus } from "../api/employer";
+import { SECTOR_OPTIONS, WORK_MODE_LABELS } from "../api/matching";
+import type { SectorCode, WorkMode } from "../api/matching";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Divider, Input, Spinner } from "../components/ui";
 import JobSkillsEditor from "../components/JobSkillsEditor";
@@ -84,7 +86,8 @@ export default function JobEditor({ mode }: Props) {
   const [description, setDescription] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("");
-  const [remoteEligible, setRemoteEligible] = useState<boolean | null>(null);
+  const [sectorTags, setSectorTags] = useState<SectorCode[]>([]);
+  const [workMode, setWorkMode] = useState<WorkMode | "">("");
   const [minExperienceYears, setMinExperienceYears] = useState("");
 
   // New fields
@@ -117,7 +120,8 @@ export default function JobEditor({ mode }: Props) {
         setDescription(detail.description);
         setCompanyName(detail.companyName ?? "");
         setLocation(detail.location ?? "");
-        setRemoteEligible(detail.remoteEligible);
+        setSectorTags(detail.sectorTags ?? []);
+        setWorkMode(detail.workMode ?? "");
         setMinExperienceYears(
           detail.minExperienceYears == null ? "" : String(detail.minExperienceYears)
         );
@@ -156,7 +160,8 @@ export default function JobEditor({ mode }: Props) {
     setDescription(detail.description);
     setCompanyName(detail.companyName ?? "");
     setLocation(detail.location ?? "");
-    setRemoteEligible(detail.remoteEligible);
+    setSectorTags(detail.sectorTags ?? []);
+    setWorkMode(detail.workMode ?? "");
     setMinExperienceYears(
       detail.minExperienceYears == null ? "" : String(detail.minExperienceYears)
     );
@@ -231,7 +236,8 @@ export default function JobEditor({ mode }: Props) {
         description: trimmedDescription,
         companyName: trimmedCompanyName || null,
         location: trimmedLocation || null,
-        remoteEligible,
+        sectorTags,
+        workMode: workMode || null,
         minExperienceYears: parsedExperience,
         salaryMin: parsedSalaryMin,
         salaryMax: parsedSalaryMax,
@@ -387,17 +393,38 @@ export default function JobEditor({ mode }: Props) {
                 placeholder="Chicago, IL"
               />
 
+              <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+                <legend style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)", marginBottom: "0.55rem" }}>
+                  Sector tags
+                </legend>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {SECTOR_OPTIONS.map((option) => (
+                    <label key={option.value} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8125rem", color: "var(--ink-2)", padding: "0.4rem 0.55rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: sectorTags.includes(option.value) ? "var(--accent-faint)" : "var(--bg-card)" }}>
+                      <input
+                        type="checkbox"
+                        checked={sectorTags.includes(option.value)}
+                        onChange={() => setSectorTags((current) => current.includes(option.value) ? current.filter((value) => value !== option.value) : [...current, option.value])}
+                        disabled={isDisabled}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "var(--ink-muted)", marginTop: "0.5rem" }}>
+                  Candidates who choose a sector will only see jobs tagged with at least one matching sector.
+                </p>
+              </fieldset>
+
               <label style={{ display: "flex", flexDirection: "column", gap: "0.375rem", fontSize: "0.875rem", color: "var(--ink-2)" }}>
-                Remote eligibility
+                Work mode
                 <select
-                  value={remoteEligible == null ? "" : String(remoteEligible)}
-                  onChange={(e) => setRemoteEligible(e.target.value === "" ? null : e.target.value === "true")}
+                  value={workMode}
+                  onChange={(e) => setWorkMode(e.target.value as WorkMode | "")}
                   disabled={isDisabled}
                   style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}
                 >
                   <option value="">Not specified</option>
-                  <option value="true">Remote eligible</option>
-                  <option value="false">On-site only</option>
+                  {(Object.keys(WORK_MODE_LABELS) as WorkMode[]).map((value) => <option key={value} value={value}>{WORK_MODE_LABELS[value]}</option>)}
                 </select>
               </label>
 

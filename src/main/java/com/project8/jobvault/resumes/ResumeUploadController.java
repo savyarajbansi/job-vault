@@ -14,7 +14,6 @@ import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,7 +27,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.unit.DataSize;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -69,30 +67,6 @@ public class ResumeUploadController {
         this.maxFileSize = maxFileSize;
     }
 
-    @GetMapping
-    public ResponseEntity<ResumeHistoryResponse> history(
-            @AuthenticationPrincipal JwtPrincipal principal,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "0") int offset) {
-        UserAccount seeker = requireUser(principal);
-        List<ResumeMetadata> resumes = resumeMetadataRepository
-                .findAllBySeekerIdOrderByCreatedAtDesc(seeker.getId());
-        int total = resumes.size();
-        int safeOffset = Math.max(0, offset);
-        int safeLimit = Math.max(1, limit);
-        int end = Math.min(total, safeOffset + safeLimit);
-
-        List<ResumeHistoryResponse.ResumeHistoryItem> items = List.of();
-        if (safeOffset < end) {
-            items = resumes.subList(safeOffset, end).stream()
-                    .map(this::toHistoryItem)
-                    .toList();
-        }
-        return ResponseEntity.ok(new ResumeHistoryResponse(
-                items,
-                new ResumeHistoryResponse.ResumeHistoryPage(safeLimit, safeOffset, total)));
-    }
-
     @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ResumeUploadResponse> upload(
             @AuthenticationPrincipal JwtPrincipal principal,
@@ -101,27 +75,32 @@ public class ResumeUploadController {
         rateLimitService.checkUpload(seeker.getId());
         String contentType = resolvePdfContentType(file);
 
-        ResumeMetadata metadata = new ResumeMetadata();
-        metadata.setSeeker(seeker);
-        metadata.setOriginalFilename(safeFilename(file.getOriginalFilename()));
-        metadata.setContentType(contentType);
-        metadata.setFileSizeBytes(file.getSize());
-        metadata.setProcessingStatus(ResumeProcessingStatus.UPLOADED);
-        ResumeMetadata saved = resumeMetadataRepository.save(metadata);
+        ResumeMetadata existing = resumeMetadataRepository.findBySeekerId(seeker.getId()).orElse(null);
+        ResumeMetadata saved = existing;
+        if (saved == null) {
+            saved = new ResumeMetadata();
+            saved.setSeeker(seeker);
+            saved.setOriginalFilename(safeFilename(file.getOriginalFilename()));
+            saved.setContentType(contentType);
+            saved.setFileSizeBytes(file.getSize());
+            saved.setProcessingStatus(ResumeProcessingStatus.UPLOADED);
+            saved = resumeMetadataRepository.save(saved);
+        }
 
         long parseStart = 0L;
         boolean parseStarted = false;
         try {
-            String storageLocation = storageService.store(saved.getId(), file);
-            saved.setStorageLocation(storageLocation);
-            saved.setStorageType("LOCAL_DISK");
-            saved.setStorageKey(storageLocation);
-            saved.setProcessingStatus(ResumeProcessingStatus.PARSING);
-            resumeMetadataRepository.save(saved);
-
             parseStart = System.nanoTime();
             parseStarted = true;
             ParseResult result = resumeParser.parse(file.getBytes());
+            // Do not touch the current metadata or file until the replacement parses.
+            String storageLocation = storageService.store(saved.getId(), file);
+            saved.setOriginalFilename(safeFilename(file.getOriginalFilename()));
+            saved.setContentType(contentType);
+            saved.setFileSizeBytes(file.getSize());
+            saved.setStorageLocation(storageLocation);
+            saved.setStorageType("LOCAL_DISK");
+            saved.setStorageKey(storageLocation);
             saved.setParsedText(result.extractedText());
             saved.setInferredSkills(joinSkills(result.inferredSkills()));
             saved.setParsedAt(clock.instant());
@@ -131,17 +110,21 @@ public class ResumeUploadController {
             recordParseAttempt(saved, ResumeParseAttemptStatus.SUCCESS, null, parseStart, result);
         } catch (ParseErrorException ex) {
             recordParseAttempt(saved, ResumeParseAttemptStatus.FAILED, ex.getCode(), parseStart, null);
-            saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
-            saved.setFailureCode(ex.getCode());
-            resumeMetadataRepository.save(saved);
+            if (existing == null) {
+                saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
+                saved.setFailureCode(ex.getCode());
+                resumeMetadataRepository.save(saved);
+            }
             throw ex;
         } catch (IOException ex) {
             if (parseStarted) {
                 recordParseAttempt(saved, ResumeParseAttemptStatus.FAILED, UploadErrorCodes.UPLOAD_FAILED, parseStart, null);
             }
-            saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
-            saved.setFailureCode(UploadErrorCodes.UPLOAD_FAILED);
-            resumeMetadataRepository.save(saved);
+            if (existing == null) {
+                saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
+                saved.setFailureCode(UploadErrorCodes.UPLOAD_FAILED);
+                resumeMetadataRepository.save(saved);
+            }
             throw new UploadErrorException(
                     UploadErrorCodes.UPLOAD_FAILED,
                     UploadErrorCodes.MESSAGE_UPLOAD_FAILED,
@@ -222,28 +205,6 @@ public class ResumeUploadController {
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .collect(Collectors.joining(","));
-    }
-
-    private List<String> splitSkills(String csv) {
-        if (csv == null || csv.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .distinct()
-                .toList();
-    }
-
-    private ResumeHistoryResponse.ResumeHistoryItem toHistoryItem(ResumeMetadata resume) {
-        return new ResumeHistoryResponse.ResumeHistoryItem(
-                resume.getId(),
-                resume.getOriginalFilename(),
-                resume.getProcessingStatus(),
-                resume.getFailureCode(),
-                resume.getCreatedAt(),
-                resume.getParsedAt(),
-                splitSkills(resume.getInferredSkills()));
     }
 
     private void recordParseAttempt(

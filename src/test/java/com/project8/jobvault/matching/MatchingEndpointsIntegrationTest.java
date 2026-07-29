@@ -6,6 +6,7 @@ import com.project8.jobvault.auth.RefreshTokenRepository;
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobRepository;
 import com.project8.jobvault.jobs.JobStatus;
+import com.project8.jobvault.jobs.CandidateMatchNotificationRepository;
 import com.project8.jobvault.notifications.NotificationRepository;
 import com.project8.jobvault.resumes.ResumeMetadata;
 import com.project8.jobvault.resumes.ResumeMetadataRepository;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -89,6 +92,12 @@ class MatchingEndpointsIntegrationTest {
     private NotificationRepository notificationRepository;
 
     @MockitoBean
+    private CandidateMatchNotificationRepository candidateMatchNotificationRepository;
+
+    @MockitoBean
+    private MatchResultRepository matchResultRepository;
+
+    @MockitoBean
     private SkillRepository skillRepository;
 
     private UserAccount seekerUser;
@@ -140,7 +149,7 @@ class MatchingEndpointsIntegrationTest {
                 Set.of(skill("java"), skill("spring"), skill("kubernetes")));
         strongMatchJob.setCompanyName("Acme Corp");
         strongMatchJob.setLocation("Austin, TX");
-        strongMatchJob.setRemoteEligible(false);
+        strongMatchJob.setWorkMode(WorkMode.REMOTE);
         strongMatchJob.setMinExperienceYears(3);
         strongMatchJob.setSalaryMin(80000);
         strongMatchJob.setSalaryMax(120000);
@@ -152,7 +161,7 @@ class MatchingEndpointsIntegrationTest {
                 "React TypeScript UI performance",
                 Set.of(skill("react"), skill("typescript")));
         weakMatchJob.setLocation("New York, NY");
-        weakMatchJob.setRemoteEligible(false);
+        weakMatchJob.setWorkMode(WorkMode.REMOTE);
         weakMatchJob.setMinExperienceYears(6);
 
         when(resumeMetadataRepository.findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
@@ -160,9 +169,14 @@ class MatchingEndpointsIntegrationTest {
                 ResumeProcessingStatus.PARSED)).thenReturn(Optional.of(seekerResume));
         when(resumeMetadataRepository.findAllByProcessingStatusOrderByParsedAtDesc(
                 ResumeProcessingStatus.PARSED)).thenReturn(List.of(seekerResume));
+        when(resumeMetadataRepository.findParsedEnabled(
+                ArgumentMatchers.eq(ResumeProcessingStatus.PARSED), ArgumentMatchers.any()))
+                .thenReturn(new PageImpl<>(List.of(seekerResume)));
 
         when(jobRepository.findAllByStatusOrderByCreatedAtDesc(JobStatus.ACTIVE))
                 .thenReturn(List.of(strongMatchJob, weakMatchJob));
+        when(jobRepository.findAllByStatus(ArgumentMatchers.eq(JobStatus.ACTIVE), ArgumentMatchers.any()))
+                .thenReturn(new PageImpl<>(List.of(strongMatchJob, weakMatchJob)));
         when(jobRepository.findByIdAndStatus(nonNullArgument(), ArgumentMatchers.eq(JobStatus.ACTIVE)))
                 .thenAnswer(invocation -> {
                     UUID id = invocation.getArgument(0);
@@ -223,6 +237,59 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].resumeId").value(seekerResume.getId().toString()))
                 .andExpect(jsonPath("$.items[0].seekerId").value(seekerUser.getId().toString()));
+    }
+
+    @Test
+    void employerCandidatesExcludeIneligibleSeekerBeforePagination() throws Exception {
+        seekerUser.setPreferredSectors("IT");
+        seekerUser.setWorkMode(WorkMode.REMOTE);
+        strongMatchJob.setSectorTags("HEALTHCARE");
+        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
+
+        mockMvc.perform(get("/api/employer/jobs/{jobId}/matches/candidates", strongMatchJob.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.page.total").value(0));
+    }
+
+    @Test
+    void cachedEmployerCandidatesExcludeIneligibleSeekerBeforeDeduplication() throws Exception {
+        seekerUser.setPreferredSectors("IT");
+        seekerUser.setWorkMode(WorkMode.REMOTE);
+        strongMatchJob.setSectorTags("HEALTHCARE");
+        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
+        ReflectionTestUtils.setField(strongMatchJob, "updatedAt", Instant.parse("2026-05-10T12:00:00Z"));
+
+        TestMatchResult cached = new TestMatchResult();
+        cached.setJob(strongMatchJob);
+        cached.setResume(seekerResume);
+        cached.setOverallScore(1.0);
+        when(matchResultRepository.countValidForJob(nonNullArgument(), nonNullArgument(), nonNullArgument(), nonNullArgument()))
+                .thenReturn(0L);
+        when(matchResultRepository.findValidForJobAll(nonNullArgument(), nonNullArgument(), nonNullArgument(), nonNullArgument()))
+                .thenReturn(List.of(cached));
+
+        mockMvc.perform(get("/api/employer/jobs/{jobId}/matches/candidates", strongMatchJob.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.page.total").value(0));
+    }
+
+    @Test
+    void shortlistCreationRejectsIneligibleSeeker() throws Exception {
+        seekerUser.setPreferredSectors("IT");
+        seekerUser.setWorkMode(WorkMode.REMOTE);
+        strongMatchJob.setSectorTags("HEALTHCARE");
+        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/employer/jobs/{jobId}/matches", strongMatchJob.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"seekerId\":\"" + seekerUser.getId() + "\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -305,6 +372,9 @@ class MatchingEndpointsIntegrationTest {
     }
 
     static final class TestResumeMetadata extends ResumeMetadata {
+    }
+
+    static final class TestMatchResult extends MatchResult {
     }
 
     static final class TestJob extends Job {

@@ -84,9 +84,9 @@ class SeekerProfileIntegrationTest {
     void setUp() {
         Role seekerRole = buildRole("JOB_SEEKER");
         seekerUser = buildUser("seeker@example.com", seekerRole);
-        seekerUser.setPreferredSector("Backend");
+        seekerUser.setPreferredSectors("SOFTWARE,IT");
         seekerUser.setPreferredLocation("Kathmandu");
-        seekerUser.setRemoteOk(Boolean.TRUE);
+        seekerUser.setWorkMode(com.project8.jobvault.matching.WorkMode.REMOTE);
         seekerUser.setYearsExperience(4);
 
         when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
@@ -105,9 +105,10 @@ class SeekerProfileIntegrationTest {
         mockMvc.perform(get("/api/seeker/profile")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.preferredSector").value("Backend"))
+                .andExpect(jsonPath("$.preferredSectors[0]").value("SOFTWARE"))
+                .andExpect(jsonPath("$.preferredSectors[1]").value("IT"))
                 .andExpect(jsonPath("$.preferredLocation").value("Kathmandu"))
-                .andExpect(jsonPath("$.remoteOk").value(true))
+                .andExpect(jsonPath("$.workMode").value("REMOTE"))
                 .andExpect(jsonPath("$.yearsExperience").value(4));
     }
 
@@ -118,16 +119,16 @@ class SeekerProfileIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("""
                         {
-                          "preferredSector":"Platform",
+                          "preferredSectors":["IT"],
                           "preferredLocation":"  Lalitpur  ",
-                          "remoteOk":false,
+                          "workMode":"HYBRID",
                           "yearsExperience":7
                         }
                         """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.preferredSector").value("Platform"))
+                .andExpect(jsonPath("$.preferredSectors[0]").value("IT"))
                 .andExpect(jsonPath("$.preferredLocation").value("Lalitpur"))
-                .andExpect(jsonPath("$.remoteOk").value(false))
+                .andExpect(jsonPath("$.workMode").value("HYBRID"))
                 .andExpect(jsonPath("$.yearsExperience").value(7));
     }
 
@@ -138,7 +139,7 @@ class SeekerProfileIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("""
                         {
-                          "preferredSector":"Platform",
+                          "preferredSectors":["IT"],
                           "yearsExperience":61
                         }
                         """))

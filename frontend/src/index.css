@@ -366,6 +366,67 @@ button { font-family: var(--font-body); cursor: pointer; }
   gap: var(--space-6);
   align-items: start;
 }
+.profile-sheet {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--space-8);
+}
+.profile-sheet__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+.profile-sheet__identity {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+.profile-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--border);
+}
+.profile-sheet__skills { padding-top: var(--space-6); }
+.profile-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+}
+.profile-facts div { min-width: 0; }
+.profile-facts dt {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+.profile-facts dd { color: var(--ink-2); margin: 0; overflow-wrap: anywhere; }
+.skill-cloud { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.skill-cloud span {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 .seeker-dashboard__content {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
@@ -390,6 +451,11 @@ button { font-family: var(--font-body); cursor: pointer; }
   .page { padding: var(--space-6) var(--space-4) var(--space-12); }
   .page-header { align-items: flex-start; flex-direction: column; gap: var(--space-4); }
   .seeker-dashboard__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-sheet { padding: var(--space-5); }
+  .profile-sheet__header { flex-direction: column; }
+  .profile-sheet__identity { flex-direction: column; }
+  .profile-sheet__grid { grid-template-columns: 1fr; gap: var(--space-6); }
+  .profile-facts { grid-template-columns: 1fr; }
 }
 
 /* ─── Interactive base reset ────────────────────────────────────────────────*/

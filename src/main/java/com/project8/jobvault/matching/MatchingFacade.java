@@ -1,5 +1,8 @@
 package com.project8.jobvault.matching;
 
+import com.project8.jobvault.jobs.CandidateMatchNotificationRepository;
+import com.project8.jobvault.jobs.CandidateMatchNotification;
+import com.project8.jobvault.jobs.CandidateMatchStatus;
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobRepository;
 import com.project8.jobvault.jobs.JobStatus;
@@ -11,6 +14,9 @@ import com.project8.jobvault.users.UserAccount;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.List;
 import java.util.Objects;
 import java.util.PriorityQueue;
@@ -25,7 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MatchingFacade {
-    public static final String ALGORITHM_VERSION = "matching-v2";
+    public static final String ALGORITHM_VERSION = "matching-v4";
     private static final int CACHE_BATCH_SIZE = 500;
     private static final String SKILL_SEPARATOR = "\u001f";
 
@@ -33,6 +39,7 @@ public class MatchingFacade {
     private final ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider;
     private final ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider;
     private final ObjectProvider<MatchResultRepository> matchResultRepositoryProvider;
+    private final ObjectProvider<CandidateMatchNotificationRepository> shortlistRepositoryProvider;
     private final CorpusIdfService corpusIdfService;
     private final MatchScorer matchScorer;
 
@@ -41,12 +48,14 @@ public class MatchingFacade {
             ObjectProvider<ResumeMetadataRepository> resumeMetadataRepositoryProvider,
             ObjectProvider<MatchAttemptRepository> matchAttemptRepositoryProvider,
             ObjectProvider<MatchResultRepository> matchResultRepositoryProvider,
+            ObjectProvider<CandidateMatchNotificationRepository> shortlistRepositoryProvider,
             CorpusIdfService corpusIdfService,
             MatchScorer matchScorer) {
         this.jobRepositoryProvider = jobRepositoryProvider;
         this.resumeMetadataRepositoryProvider = resumeMetadataRepositoryProvider;
         this.matchAttemptRepositoryProvider = matchAttemptRepositoryProvider;
         this.matchResultRepositoryProvider = matchResultRepositoryProvider;
+        this.shortlistRepositoryProvider = shortlistRepositoryProvider;
         this.corpusIdfService = corpusIdfService;
         this.matchScorer = matchScorer;
     }
@@ -63,27 +72,30 @@ public class MatchingFacade {
             MatchResultRepository cache = matchResultRepository();
             if (cache != null && hasRevision(resume.getUpdatedAt()) && hasRevision(seeker.getUpdatedAt())) {
                 ensureResumeCache(resume, seeker, cache);
-                Page<MatchResult> page = cache.findValidForResume(
+                List<MatchResult> cached = cache.findValidForResumeAll(
                         resume.getId(),
                         resume.getUpdatedAt(),
                         seeker.getUpdatedAt(),
                         ALGORITHM_VERSION,
-                        corpusIdfService.getSnapshot().fingerprint(),
-                        new OffsetPageRequest(offset, limit));
-                if (page != null) {
-                    List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = page.getContent().stream()
+                        corpusIdfService.getSnapshot().fingerprint());
+                if (cached != null) {
+                    List<MatchResult> eligible = cached.stream()
+                            .filter(result -> isEligible(seeker, result.getJob()))
+                            .toList();
+                    List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = pageSlice(eligible, offset, limit).stream()
                             .map(this::toSeekerItem)
                             .toList();
                     SeekerJobMatchResponse response = new SeekerJobMatchResponse(
-                            items, new MatchPage(limit, offset, toInt(page.getTotalElements())));
+                            items, new MatchPage(limit, offset, toInt(eligible.size())));
                     recordMatchAttempt(null, resume, MatchAttemptStatus.SUCCESS, null,
-                            startNanos, toInt(page.getTotalElements()));
+                            startNanos, toInt(eligible.size()));
                     return response;
                 }
             }
 
             int maxResults = offset + limit;
             PriorityQueue<ScoredJob> topMatches = new PriorityQueue<>(maxResults, this::compareWorstJobFirst);
+            long eligibleTotal = 0;
             Page<Job> jobPage;
             int pageNumber = 0;
             do {
@@ -93,6 +105,10 @@ public class MatchingFacade {
                     break;
                 }
                 for (Job job : jobPage.getContent()) {
+                    if (!isEligible(seeker, job)) {
+                        continue;
+                    }
+                    eligibleTotal++;
                     topMatches.offer(new ScoredJob(job, scoreResumeAgainstJob(resume, job, seeker)));
                     if (topMatches.size() > maxResults) {
                         topMatches.poll();
@@ -100,11 +116,8 @@ public class MatchingFacade {
                 }
             } while (jobPage.hasNext());
             List<ScoredJob> scored = topMatches.stream().sorted(this::compareBestJobFirst).toList();
-            long total = jobRepository().countByStatus(JobStatus.ACTIVE);
-            int end = Math.min(scored.size(), maxResults);
-            List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = end <= offset
-                    ? List.of()
-                    : scored.subList(Math.min(offset, scored.size()), end).stream()
+            long total = eligibleTotal;
+            List<SeekerJobMatchResponse.SeekerJobMatchResponseItem> items = pageSlice(scored, offset, limit).stream()
                             .map(item -> new SeekerJobMatchResponse.SeekerJobMatchResponseItem(
                                     item.job().getId(),
                                     item.breakdown().overallScore(),
@@ -139,26 +152,35 @@ public class MatchingFacade {
             MatchResultRepository cache = matchResultRepository();
             if (cache != null && hasRevision(job.getUpdatedAt())) {
                 ensureJobCache(job, cache);
-                Page<MatchResult> page = cache.findValidForJob(
+                List<MatchResult> cached = cache.findValidForJobAll(
                         job.getId(),
                         job.getUpdatedAt(),
                         ALGORITHM_VERSION,
-                        corpusIdfService.getSnapshot().fingerprint(),
-                        new OffsetPageRequest(offset, limit));
-                if (page != null) {
-                    List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = page.getContent().stream()
+                        corpusIdfService.getSnapshot().fingerprint());
+                if (cached != null) {
+                    Job eligibleJob = job;
+                    List<MatchResult> eligible = cached.stream()
+                            .filter(result -> {
+                                ResumeMetadata resume = result.getResume();
+                                UserAccount candidate = resume == null ? null : resume.getSeeker();
+                                return candidate != null && isEligible(candidate, eligibleJob);
+                            })
+                            .toList();
+                    List<MatchResult> unique = uniqueSeekerResults(eligible);
+                    List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = pageSlice(unique, offset, limit).stream()
                             .map(this::toEmployerItem)
                             .toList();
                     EmployerCandidateMatchResponse response = new EmployerCandidateMatchResponse(
-                            items, new MatchPage(limit, offset, toInt(page.getTotalElements())));
+                            items, new MatchPage(limit, offset, toInt(unique.size())));
                     recordMatchAttempt(job, null, MatchAttemptStatus.SUCCESS, null,
-                            startNanos, toInt(page.getTotalElements()));
+                            startNanos, toInt(unique.size()));
                     return response;
                 }
             }
 
             int maxResults = offset + limit;
             PriorityQueue<ScoredResume> topMatches = new PriorityQueue<>(maxResults, this::compareWorstResumeFirst);
+            Set<UUID> seenSeekers = new java.util.HashSet<>();
             Page<ResumeMetadata> resumePage;
             int pageNumber = 0;
             do {
@@ -172,6 +194,12 @@ public class MatchingFacade {
                     if (candidate == null || !candidate.isEnabled()) {
                         continue;
                     }
+                    if (!isEligible(candidate, job)) {
+                        continue;
+                    }
+                    if (!seenSeekers.add(candidate.getId())) {
+                        continue;
+                    }
                     topMatches.offer(new ScoredResume(resume, scoreResumeAgainstJob(resume, job, candidate)));
                     if (topMatches.size() > maxResults) {
                         topMatches.poll();
@@ -179,13 +207,10 @@ public class MatchingFacade {
                 }
             } while (resumePage.hasNext());
             List<ScoredResume> scored = topMatches.stream().sorted(this::compareBestResumeFirst).toList();
-            long total = resumeMetadataRepository().countByProcessingStatusAndSeekerEnabled(
-                    ResumeProcessingStatus.PARSED, true);
-            int end = Math.min(scored.size(), maxResults);
-            List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = end <= offset
-                    ? List.of()
-                    : scored.subList(Math.min(offset, scored.size()), end).stream()
-                            .map(item -> toEmployerItem(item.resume(), item.breakdown())).toList();
+            long total = seenSeekers.size();
+            UUID resolvedJobId = job.getId();
+            List<EmployerCandidateMatchResponse.EmployerCandidateMatchItem> items = pageSlice(scored, offset, limit).stream()
+                            .map(item -> toEmployerItem(resolvedJobId, item.resume(), item.breakdown())).toList();
             EmployerCandidateMatchResponse response = new EmployerCandidateMatchResponse(
                     items, new MatchPage(limit, offset, toInt(total)));
             recordMatchAttempt(job, null, MatchAttemptStatus.SUCCESS, null,
@@ -234,6 +259,9 @@ public class MatchingFacade {
         UserAccount seeker = resume.getSeeker();
         if (seeker == null || !Objects.equals(seeker.getId(), seekerId) || !seeker.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Seeker not found");
+        }
+        if (!isEligible(seeker, job)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate is not eligible for this job");
         }
         return scoreResumeAgainstJob(resume, job, seeker);
     }
@@ -305,10 +333,12 @@ public class MatchingFacade {
         result.setSkillsScore(scored.factors().skillsOverlap());
         result.setExperienceScore(scored.factors().experience());
         result.setLocationScore(scored.factors().location());
+        result.setSectorScore(0.0);
         result.setCosineAvailable(scored.factors().cosineAvailable());
         result.setSkillsAvailable(scored.factors().skillsAvailable());
         result.setExperienceAvailable(scored.factors().experienceAvailable());
         result.setLocationAvailable(scored.factors().locationAvailable());
+        result.setSectorAvailable(false);
         result.setMissingSkills(String.join(SKILL_SEPARATOR, scored.missingSkills()));
         result.setAlgorithmVersion(ALGORITHM_VERSION);
         result.setCorpusFingerprint(snapshot.fingerprint());
@@ -336,18 +366,20 @@ public class MatchingFacade {
                 || seeker.getDisplayName().isBlank() ? null : seeker.getDisplayName();
         return new EmployerCandidateMatchResponse.EmployerCandidateMatchItem(
                 result.getResume().getId(), seekerId, displayName,
-                scored.overallScore(), scored.factors(), scored.missingSkills());
+                scored.overallScore(), scored.factors(), scored.missingSkills(),
+                shortlistStatus(result.getJob().getId(), seekerId));
     }
 
     private EmployerCandidateMatchResponse.EmployerCandidateMatchItem toEmployerItem(
-            ResumeMetadata resume, ScoredMatch scored) {
+            UUID jobId, ResumeMetadata resume, ScoredMatch scored) {
         UserAccount seeker = resume.getSeeker();
         UUID seekerId = seeker == null ? null : seeker.getId();
         String displayName = seeker == null || seeker.getDisplayName() == null || seeker.getDisplayName().isBlank()
                 ? null
                 : seeker.getDisplayName();
         return new EmployerCandidateMatchResponse.EmployerCandidateMatchItem(
-                resume.getId(), seekerId, displayName, scored.overallScore(), scored.factors(), scored.missingSkills());
+                resume.getId(), seekerId, displayName, scored.overallScore(), scored.factors(), scored.missingSkills(),
+                shortlistStatus(jobId, seekerId));
     }
 
     private ScoredMatch fromResult(MatchResult result) {
@@ -371,8 +403,42 @@ public class MatchingFacade {
                         .sorted()
                         .toList();
         return new SeekerJobMatchResponse.JobInfo(
-                job.getTitle(), job.getCompanyName(), job.getLocation(), job.getRemoteEligible(),
-                job.getSalaryMin(), job.getSalaryMax(), job.getEducationRequirement(), requiredSkills);
+                job.getTitle(), job.getCompanyName(), MatchingPreferences.parseSectors(job.getSectorTags()),
+                job.getLocation(), job.getWorkMode(), job.getSalaryMin(), job.getSalaryMax(),
+                job.getEducationRequirement(), requiredSkills);
+    }
+
+    private CandidateMatchStatus shortlistStatus(UUID jobId, UUID seekerId) {
+        CandidateMatchNotificationRepository repository = shortlistRepositoryProvider.getIfAvailable();
+        if (repository == null || jobId == null || seekerId == null) {
+            return null;
+        }
+        return repository.findByJobIdAndSeekerId(jobId, seekerId)
+                .map(CandidateMatchNotification::getStatus)
+                .orElse(null);
+    }
+
+    private boolean isEligible(UserAccount seeker, Job job) {
+        return MatchingPreferences.sectorMatches(seeker.getPreferredSectors(), job.getSectorTags())
+                && MatchingPreferences.workModeMatches(seeker.getWorkMode(), job.getWorkMode());
+    }
+
+    private List<MatchResult> uniqueSeekerResults(List<MatchResult> results) {
+        Map<UUID, MatchResult> unique = new LinkedHashMap<>();
+        for (MatchResult result : results) {
+            if (result.getResume() == null || result.getResume().getSeeker() == null) {
+                continue;
+            }
+            unique.putIfAbsent(result.getResume().getSeeker().getId(), result);
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private <T> List<T> pageSlice(List<T> values, int offset, int limit) {
+        if (offset >= values.size()) {
+            return List.of();
+        }
+        return values.subList(offset, Math.min(values.size(), offset + limit));
     }
 
     private void sortJobs(List<ScoredJob> scored) {

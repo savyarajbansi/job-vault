@@ -3,6 +3,7 @@ package com.project8.jobvault.jobs;
 import com.project8.jobvault.skills.Skill;
 import com.project8.jobvault.skills.SkillRepository;
 import com.project8.jobvault.skills.TrendingSkillResponse;
+import com.project8.jobvault.matching.MatchingPreferences;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,8 +35,9 @@ public class PublicJobController {
                         job.getId(),
                         job.getTitle(),
                         job.getCompanyName(),
+                        MatchingPreferences.parseSectors(job.getSectorTags()),
                         job.getLocation(),
-                        job.getRemoteEligible(),
+                        job.getWorkMode(),
                         job.getMinExperienceYears(),
                         job.getSalaryMin(),
                         job.getSalaryMax(),
@@ -60,8 +62,9 @@ public class PublicJobController {
                     value.getTitle(),
                     value.getDescription(),
                     value.getCompanyName(),
+                    MatchingPreferences.parseSectors(value.getSectorTags()),
                     value.getLocation(),
-                    value.getRemoteEligible(),
+                    value.getWorkMode(),
                     value.getMinExperienceYears(),
                     value.getSalaryMin(),
                     value.getSalaryMax(),

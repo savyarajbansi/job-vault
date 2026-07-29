@@ -279,6 +279,48 @@ class ResumeUploadIntegrationTest {
         assertEquals(ParseErrorCodes.PARSE_FAILED, metadata.getFailureCode());
     }
 
+    @Test
+    void failedReplacementPreservesCurrentParsedResume() throws Exception {
+        ResumeMetadata existing = new TestResumeMetadata();
+        existing.setId(UUID.randomUUID());
+        existing.setSeeker(seekerUser);
+        existing.setOriginalFilename("current.pdf");
+        existing.setContentType("application/pdf");
+        existing.setFileSizeBytes(123L);
+        existing.setStorageLocation("storage/resumes/current.pdf");
+        existing.setStorageType("LOCAL_DISK");
+        existing.setStorageKey("storage/resumes/current.pdf");
+        existing.setParsedText("Current Java resume");
+        existing.setInferredSkills("java,spring");
+        existing.setProcessingStatus(ResumeProcessingStatus.PARSED);
+        when(resumeMetadataRepository.findBySeekerId(seekerUser.getId())).thenReturn(Optional.of(existing));
+        when(resumeParser.parse(nonNullArgument()))
+                .thenThrow(new ParseErrorException(
+                        ParseErrorCodes.PARSE_FAILED,
+                        ParseErrorCodes.MESSAGE_PARSE_FAILED,
+                        HttpStatus.UNPROCESSABLE_ENTITY));
+
+        MockMultipartFile replacement = new MockMultipartFile(
+                "file",
+                "replacement.pdf",
+                "application/pdf",
+                "replacement content".getBytes());
+
+        mockMvc.perform(multipart("/api/seeker/resumes/upload")
+                .file(replacement)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(ParseErrorCodes.PARSE_FAILED));
+
+        assertEquals("current.pdf", existing.getOriginalFilename());
+        assertEquals("storage/resumes/current.pdf", existing.getStorageKey());
+        assertEquals("Current Java resume", existing.getParsedText());
+        assertEquals("java,spring", existing.getInferredSkills());
+        assertEquals(ResumeProcessingStatus.PARSED, existing.getProcessingStatus());
+        org.mockito.Mockito.verify(resumeStorageService, org.mockito.Mockito.never())
+                .store(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
     private String issueToken(UserAccount user) {
         return jwtTokenService.issueAccessToken(user).token();
     }
@@ -309,5 +351,8 @@ class ResumeUploadIntegrationTest {
     }
 
     static final class TestUserAccount extends UserAccount {
+    }
+
+    static final class TestResumeMetadata extends ResumeMetadata {
     }
 }

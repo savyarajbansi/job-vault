@@ -176,7 +176,7 @@ class EmployerJobRequiredSkillsIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"name\":\"Kubernetes\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.requiredSkills", hasItem("Kubernetes")));
+                .andExpect(jsonPath("$.requiredSkills", hasItem("kubernetes")));
     }
 
     @Test

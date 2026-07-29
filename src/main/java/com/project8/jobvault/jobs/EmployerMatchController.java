@@ -73,31 +73,49 @@ public class EmployerMatchController {
         }
         ScoredMatch scored = matchingFacade.scoreCurrentCandidate(jobId, seekerId);
         if (scored.overallScore() < MATCH_THRESHOLD) {
-            return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(false));
+            return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(false, null, null));
         }
 
         CandidateMatchNotificationRepository notificationRecords = notificationRecordProvider.getIfAvailable();
+        CandidateMatchNotification shortlist = null;
         if (notificationRecords != null) {
-            if (notificationRecords.existsByJobIdAndSeekerId(jobId, seekerId)) {
-                return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(false));
+            var existing = notificationRecords.findByJobIdAndSeekerId(jobId, seekerId);
+            if (existing.isPresent()) {
+                shortlist = existing.get();
+                return ResponseEntity.status(HttpStatus.CREATED).body(
+                        new CandidateMatchResponse(false, shortlist.getId(), shortlist.getStatus()));
             }
             CandidateMatchNotification record = new CandidateMatchNotification();
             record.setJob(job);
             record.setSeeker(seeker);
             record.setEmployer(employer);
             record.setScore(scored.overallScore());
+            record.setStatus(CandidateMatchStatus.PENDING);
             try {
-                notificationRecords.save(record);
+                shortlist = notificationRecords.save(record);
             } catch (DataIntegrityViolationException ex) {
-                return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(false));
+                shortlist = notificationRecords.findByJobIdAndSeekerId(jobId, seekerId).orElse(null);
+                return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(
+                        false,
+                        shortlist == null ? null : shortlist.getId(),
+                        shortlist == null ? null : shortlist.getStatus()));
             }
         }
-        notificationService.createNotification(
-                employer,
-                NotificationType.JOB_MATCH_FOUND,
-                "New candidate match for " + job.getTitle() + " (" + Math.round(scored.overallScore() * 100) + "%)");
+        if (shortlist != null) {
+            notificationService.createShortlistNotification(
+                    seeker,
+                    shortlist,
+                    "You have been shortlisted for this role.");
+        } else {
+            notificationService.createNotification(
+                    seeker,
+                    NotificationType.CANDIDATE_SHORTLISTED,
+                    "You have been shortlisted for this role.");
+        }
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(new CandidateMatchResponse(true));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                new CandidateMatchResponse(true, shortlist == null ? null : shortlist.getId(),
+                        shortlist == null ? null : shortlist.getStatus()));
     }
 
     private UserAccount requireUser(JwtPrincipal principal) {

@@ -3,6 +3,8 @@ package com.project8.jobvault.jobs;
 import com.project8.jobvault.users.UserAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -36,6 +38,10 @@ public class CandidateMatchNotification {
 
     @Column(name = "score", nullable = false)
     private double score;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CandidateMatchStatus status = CandidateMatchStatus.PENDING;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -82,6 +88,14 @@ public class CandidateMatchNotification {
 
     public void setScore(double score) {
         this.score = score;
+    }
+
+    public CandidateMatchStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(CandidateMatchStatus status) {
+        this.status = status;
     }
 
     public Instant getCreatedAt() {

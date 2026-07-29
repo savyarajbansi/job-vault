@@ -10,6 +10,7 @@ import SeekerDashboard from "./routes/SeekerDashboard";
 import SeekerMatches from "./routes/SeekerMatches";
 import SeekerApplications from "./routes/SeekerApplications";
 import SeekerProfile from "./routes/SeekerProfile";
+import SeekerProfileView from "./routes/SeekerProfileView";
 import EmployerDashboard from "./routes/EmployerDashboard";
 import JobEditor from "./routes/JobEditor";
 import CandidateMatches from "./routes/CandidateMatches";
@@ -98,6 +99,14 @@ export default function App() {
             <RequireRole role="JOB_SEEKER" fallback="/employer">
               <SeekerProfile />
             </RequireRole>
+          }
+        />
+        <Route
+          path="profiles/seekers/:seekerId"
+          element={
+            <RequireAuth>
+              <SeekerProfileView />
+            </RequireAuth>
           }
         />
 

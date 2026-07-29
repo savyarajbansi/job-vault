@@ -1,6 +1,7 @@
 package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.skills.Skill;
+import com.project8.jobvault.matching.WorkMode;
 import com.project8.jobvault.users.UserAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -43,11 +45,15 @@ public class Job {
     @Column(name = "company_name", length = 200)
     private String companyName;
 
+    @Column(name = "sector_tags", columnDefinition = "text")
+    private String sectorTags;
+
     @Column(name = "location", length = 150)
     private String location;
 
-    @Column(name = "remote_eligible")
-    private Boolean remoteEligible;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_mode", length = 20)
+    private WorkMode workMode;
 
     @Column(name = "min_experience_years")
     private Integer minExperienceYears;
@@ -144,6 +150,14 @@ public class Job {
         this.companyName = companyName;
     }
 
+    public String getSectorTags() {
+        return sectorTags;
+    }
+
+    public void setSectorTags(String sectorTags) {
+        this.sectorTags = sectorTags;
+    }
+
     public String getLocation() {
         return location;
     }
@@ -152,12 +166,37 @@ public class Job {
         this.location = location;
     }
 
-    public Boolean getRemoteEligible() {
-        return remoteEligible;
+    public WorkMode getWorkMode() {
+        return workMode;
     }
 
+    public void setWorkMode(WorkMode workMode) {
+        this.workMode = workMode;
+    }
+
+    /** Compatibility aliases for older callers while the new job API rolls out. */
+    @Transient
+    @Deprecated
+    public String getSector() {
+        return sectorTags;
+    }
+
+    @Transient
+    @Deprecated
+    public void setSector(String sector) {
+        this.sectorTags = sector;
+    }
+
+    @Transient
+    @Deprecated
+    public Boolean getRemoteEligible() {
+        return workMode == null ? null : workMode != WorkMode.ON_SITE;
+    }
+
+    @Transient
+    @Deprecated
     public void setRemoteEligible(Boolean remoteEligible) {
-        this.remoteEligible = remoteEligible;
+        this.workMode = remoteEligible == null ? null : remoteEligible ? WorkMode.REMOTE : WorkMode.ON_SITE;
     }
 
     public Integer getMinExperienceYears() {

@@ -1,5 +1,6 @@
 package com.project8.jobvault.notifications;
 
+import com.project8.jobvault.jobs.CandidateMatchNotification;
 import com.project8.jobvault.users.UserAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,6 +38,10 @@ public class Notification {
 
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidate_match_notification_id")
+    private CandidateMatchNotification candidateMatchNotification;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -83,6 +88,14 @@ public class Notification {
 
     public void setRead(boolean read) {
         isRead = read;
+    }
+
+    public CandidateMatchNotification getCandidateMatchNotification() {
+        return candidateMatchNotification;
+    }
+
+    public void setCandidateMatchNotification(CandidateMatchNotification candidateMatchNotification) {
+        this.candidateMatchNotification = candidateMatchNotification;
     }
 
     public Instant getCreatedAt() {

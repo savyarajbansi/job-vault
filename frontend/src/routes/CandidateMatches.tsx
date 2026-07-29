@@ -63,6 +63,7 @@ export default function CandidateMatches() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [notificationState, setNotificationState] = useState<Record<string, "idle" | "loading" | "notified" | "below">>({});
+  const [shortlistState, setShortlistState] = useState<Record<string, CandidateMatchItem["shortlistStatus"]>>({});
 
   const limit = 10;
 
@@ -83,6 +84,7 @@ export default function CandidateMatches() {
       setJob(jobResult);
       setPageTotal(matchResult.page.total);
       setItems(matchResult.items);
+      setShortlistState(Object.fromEntries(matchResult.items.map((item) => [item.seekerId, item.shortlistStatus])));
       setSelected((current) => {
         if (current && matchResult.items.some((item) => item.seekerId === current.seekerId)) {
           return current;
@@ -113,6 +115,7 @@ export default function CandidateMatches() {
     setNotificationState((current) => ({ ...current, [item.seekerId]: "loading" }));
     try {
       const response = await notifyEmployerCandidate(jobId, item.seekerId);
+      setShortlistState((current) => ({ ...current, [item.seekerId]: response.status }));
       setNotificationState((current) => ({
         ...current,
         [item.seekerId]: response.notified ? "notified" : "below",
@@ -154,6 +157,7 @@ export default function CandidateMatches() {
             ) : (
               items.map((item) => {
                 const activeState = notificationState[item.seekerId] ?? "idle";
+                const shortlistStatus = shortlistState[item.seekerId] ?? item.shortlistStatus;
                 const isSelected = selected?.seekerId === item.seekerId;
                 return (
                   <button
@@ -180,6 +184,8 @@ export default function CandidateMatches() {
                           </Badge>
                           {activeState === "notified" && <Badge tone="success">Notified</Badge>}
                           {activeState === "below" && <Badge tone="warn">Below threshold</Badge>}
+                          {shortlistStatus === "PENDING" && <Badge tone="accent">Shortlisted</Badge>}
+                          {shortlistStatus === "ACCEPTED" && <Badge tone="success">Offer accepted</Badge>}
                         </div>
                         <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", marginBottom: "0.5rem" }}>
                           {truncateId(item.seekerId)}
@@ -285,12 +291,20 @@ export default function CandidateMatches() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                  {jobId && (
+                    <Link
+                      to={`/profiles/seekers/${selected.seekerId}?jobId=${encodeURIComponent(jobId)}`}
+                      style={{ fontSize: "0.875rem", fontWeight: 500 }}
+                    >
+                      View full profile →
+                    </Link>
+                  )}
                   <Button
                     onClick={() => void notifyCandidate(selected)}
-                    disabled={(notificationState[selected.seekerId] ?? "idle") !== "idle"}
+                    disabled={(notificationState[selected.seekerId] ?? "idle") !== "idle" || (shortlistState[selected.seekerId] ?? selected.shortlistStatus) != null}
                     loading={(notificationState[selected.seekerId] ?? "idle") === "loading"}
                   >
-                    Notify candidate
+                    {(shortlistState[selected.seekerId] ?? selected.shortlistStatus) === "ACCEPTED" ? "Offer accepted" : (shortlistState[selected.seekerId] ?? selected.shortlistStatus) === "PENDING" ? "Already shortlisted" : "Notify candidate"}
                   </Button>
                   {notificationState[selected.seekerId] === "below" && (
                     <span style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>Score below notification threshold.</span>

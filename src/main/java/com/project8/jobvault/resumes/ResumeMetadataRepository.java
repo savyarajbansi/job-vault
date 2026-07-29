@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ResumeMetadataRepository extends JpaRepository<ResumeMetadata, UUID> {
+    Optional<ResumeMetadata> findBySeekerId(UUID seekerId);
+
     Optional<ResumeMetadata> findFirstBySeekerIdAndProcessingStatusOrderByParsedAtDescCreatedAtDesc(
             UUID seekerId,
             ResumeProcessingStatus processingStatus);
@@ -30,5 +32,4 @@ public interface ResumeMetadataRepository extends JpaRepository<ResumeMetadata, 
 
     long countByProcessingStatusAndSeekerEnabled(ResumeProcessingStatus status, boolean enabled);
 
-    List<ResumeMetadata> findAllBySeekerIdOrderByCreatedAtDesc(UUID seekerId);
 }

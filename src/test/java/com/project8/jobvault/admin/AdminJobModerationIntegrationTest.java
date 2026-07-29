@@ -205,7 +205,7 @@ class AdminJobModerationIntegrationTest {
         mockMvc.perform(post("/api/admin/jobs/{id}/approve", missingJobId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
                 .andExpect(jsonPath("$.details.reason").value("insufficient_role"));
     }
 
@@ -218,7 +218,7 @@ class AdminJobModerationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"moderationReason\":\"Policy violation\"}"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
+                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
                 .andExpect(jsonPath("$.details.reason").value("insufficient_role"));
 
         mockMvc.perform(post("/api/admin/jobs/{id}/disable", missingJobId)
@@ -320,7 +320,7 @@ class AdminJobModerationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"moderationReason\":\"   \"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
                 .andExpect(jsonPath("$.details.reason").value("validation_failed"))
                 .andExpect(jsonPath("$.details.fields.moderationReason").exists());
 
@@ -329,7 +329,7 @@ class AdminJobModerationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
                 .content("{\"moderationReason\":\"\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
+                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
                 .andExpect(jsonPath("$.details.reason").value("validation_failed"))
                 .andExpect(jsonPath("$.details.fields.moderationReason").exists());
     }

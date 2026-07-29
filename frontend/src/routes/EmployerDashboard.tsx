@@ -10,6 +10,7 @@ import {
 } from "../api/employer";
 import type { JobDetail, JobStatus, JobSummary } from "../api/employer";
 import { ApiResponseError } from "../api/client";
+import { WORK_MODE_LABELS } from "../api/matching";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
 import PageLoader from "../components/PageLoader";
 
@@ -290,11 +291,7 @@ export default function EmployerDashboard() {
                         ) : (
                           <span>Location not set</span>
                         )}
-                        {job.remoteEligible ? (
-                          <span>Remote eligible</span>
-                        ) : (
-                          <span>On-site</span>
-                        )}
+                        <span>{job.workMode ? WORK_MODE_LABELS[job.workMode] : "Work mode not set"}</span>
                         {salaryLabel && (
                           <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>
                             {salaryLabel}

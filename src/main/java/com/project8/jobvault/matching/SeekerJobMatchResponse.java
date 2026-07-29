@@ -1,6 +1,7 @@
 package com.project8.jobvault.matching;
 
 import com.project8.jobvault.jobs.EducationRequirement;
+import com.project8.jobvault.matching.WorkMode;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,8 +20,9 @@ public record SeekerJobMatchResponse(
     public record JobInfo(
             String title,
             String companyName,
+            List<String> sectorTags,
             String location,
-            Boolean remoteEligible,
+            WorkMode workMode,
             Integer salaryMin,
             Integer salaryMax,
             EducationRequirement educationRequirement,

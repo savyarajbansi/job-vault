@@ -17,6 +17,7 @@ import ApplicationStatusBadge from "../components/ApplicationStatusBadge";
 import PageLoader from "../components/PageLoader";
 import useApplicationAction from "../hooks/useApplicationAction";
 import { formatScore, isStrongMatch } from "../utils/score";
+import { WORK_MODE_LABELS } from "../api/matching";
 
 const MATCHES_PER_PAGE = 10;
 
@@ -205,9 +206,7 @@ export default function SeekerMatches() {
                           <ApplicationStatusBadge status={existingApplication.status} />
                         )}
                         {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
-                        {item.job.remoteEligible && (
-                          <Badge tone="accent">Remote eligible</Badge>
-                        )}
+                        {item.job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[item.job.workMode]}</Badge>}
                         {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
                         {isStrongMatch(item.score) ? (
                           <Badge tone="success">Strong match</Badge>
@@ -292,6 +291,7 @@ export default function SeekerMatches() {
                   </Link>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.75rem" }}>
                     {selected.job.location && <Badge tone="neutral">{selected.job.location}</Badge>}
+                    {selected.job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[selected.job.workMode]}</Badge>}
                     {selectedSalaryLabel && <Badge tone="neutral">{selectedSalaryLabel}</Badge>}
                     {selected.job.educationRequirement && (
                       <Badge tone="neutral">{EDUCATION_LABELS[selected.job.educationRequirement]}</Badge>
@@ -504,7 +504,7 @@ export default function SeekerMatches() {
                   )}
                 </div>
 
-                {selected.job.remoteEligible && (
+                {selected.job.workMode && (
                   <div
                     style={{
                       padding: "0.625rem 0.875rem",
@@ -515,7 +515,7 @@ export default function SeekerMatches() {
                       fontWeight: 500,
                     }}
                   >
-                    Remote eligible
+                    {WORK_MODE_LABELS[selected.job.workMode]} work
                   </div>
                 )}
               </Card>

@@ -1,13 +1,17 @@
 package com.project8.jobvault.users;
 
+import com.project8.jobvault.matching.WorkMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
@@ -34,14 +38,15 @@ public class UserAccount {
     @Column(name = "display_name", length = 200)
     private String displayName;
 
-    @Column(name = "preferred_sector", length = 100)
-    private String preferredSector;
+    @Column(name = "preferred_sectors", columnDefinition = "text")
+    private String preferredSectors;
 
     @Column(name = "preferred_location", length = 150)
     private String preferredLocation;
 
-    @Column(name = "remote_ok")
-    private Boolean remoteOk;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_mode", length = 20)
+    private WorkMode workMode;
 
     @Column(name = "years_experience")
     private Integer yearsExperience;
@@ -96,12 +101,12 @@ public class UserAccount {
         this.displayName = displayName;
     }
 
-    public String getPreferredSector() {
-        return preferredSector;
+    public String getPreferredSectors() {
+        return preferredSectors;
     }
 
-    public void setPreferredSector(String preferredSector) {
-        this.preferredSector = preferredSector;
+    public void setPreferredSectors(String preferredSectors) {
+        this.preferredSectors = preferredSectors;
     }
 
     public String getPreferredLocation() {
@@ -112,12 +117,37 @@ public class UserAccount {
         this.preferredLocation = preferredLocation;
     }
 
-    public Boolean getRemoteOk() {
-        return remoteOk;
+    public WorkMode getWorkMode() {
+        return workMode;
     }
 
+    public void setWorkMode(WorkMode workMode) {
+        this.workMode = workMode;
+    }
+
+    /** Compatibility alias for older callers while the new work-mode API rolls out. */
+    @Transient
+    @Deprecated
+    public String getPreferredSector() {
+        return preferredSectors;
+    }
+
+    @Transient
+    @Deprecated
+    public void setPreferredSector(String preferredSector) {
+        this.preferredSectors = preferredSector;
+    }
+
+    @Transient
+    @Deprecated
+    public Boolean getRemoteOk() {
+        return workMode == null ? null : workMode == WorkMode.REMOTE;
+    }
+
+    @Transient
+    @Deprecated
     public void setRemoteOk(Boolean remoteOk) {
-        this.remoteOk = remoteOk;
+        this.workMode = remoteOk == null ? null : remoteOk ? WorkMode.REMOTE : WorkMode.ON_SITE;
     }
 
     public Integer getYearsExperience() {

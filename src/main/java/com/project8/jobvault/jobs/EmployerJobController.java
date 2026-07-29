@@ -1,6 +1,8 @@
 package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
+import com.project8.jobvault.matching.MatchingPreferences;
+import com.project8.jobvault.matching.SectorCode;
 import com.project8.jobvault.matching.CorpusRebuildEventPublisher;
 import com.project8.jobvault.parsing.SkillCatalog;
 import com.project8.jobvault.skills.Skill;
@@ -10,6 +12,7 @@ import com.project8.jobvault.users.UserAccountRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,8 +78,9 @@ public class EmployerJobController {
         job.setTitle(request.title());
         job.setDescription(request.description());
         job.setCompanyName(normalizeText(request.companyName()));
+        job.setSectorTags(normalizeSectorTags(request.sectorTags()));
         job.setLocation(normalizeText(request.location()));
-        job.setRemoteEligible(request.remoteEligible());
+        job.setWorkMode(request.workMode());
         job.setMinExperienceYears(request.minExperienceYears());
         job.setSalaryMin(request.salaryMin());
         job.setSalaryMax(request.salaryMax());
@@ -118,8 +122,9 @@ public class EmployerJobController {
         job.setTitle(request.title());
         job.setDescription(request.description());
         job.setCompanyName(normalizeText(request.companyName()));
+        job.setSectorTags(normalizeSectorTags(request.sectorTags()));
         job.setLocation(normalizeText(request.location()));
-        job.setRemoteEligible(request.remoteEligible());
+        job.setWorkMode(request.workMode());
         job.setMinExperienceYears(request.minExperienceYears());
         job.setSalaryMin(request.salaryMin());
         job.setSalaryMax(request.salaryMax());
@@ -281,8 +286,9 @@ public class EmployerJobController {
                 job.getId(),
                 job.getTitle(),
                 job.getCompanyName(),
+                MatchingPreferences.parseSectors(job.getSectorTags()),
                 job.getLocation(),
-                job.getRemoteEligible(),
+                job.getWorkMode(),
                 job.getMinExperienceYears(),
                 job.getSalaryMin(),
                 job.getSalaryMax(),
@@ -303,8 +309,9 @@ public class EmployerJobController {
                 job.getTitle(),
                 job.getDescription(),
                 job.getCompanyName(),
+                MatchingPreferences.parseSectors(job.getSectorTags()),
                 job.getLocation(),
-                job.getRemoteEligible(),
+                job.getWorkMode(),
                 job.getMinExperienceYears(),
                 job.getSalaryMin(),
                 job.getSalaryMax(),
@@ -323,5 +330,25 @@ public class EmployerJobController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeSectorTags(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        List<String> normalized = values.stream()
+                .filter(Objects::nonNull)
+                .map(value -> value.trim().toUpperCase(Locale.ROOT))
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .toList();
+        for (String value : normalized) {
+            try {
+                SectorCode.valueOf(value);
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported sector tag: " + value);
+            }
+        }
+        return MatchingPreferences.joinSectors(normalized);
     }
 }

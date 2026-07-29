@@ -1,5 +1,6 @@
 package com.project8.jobvault.matching;
 
+import com.project8.jobvault.jobs.CandidateMatchStatus;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,7 @@ public record EmployerCandidateMatchResponse(
             String seekerName,
             double score,
             MatchFactorBreakdown factors,
-            List<String> missingSkills) {
+            List<String> missingSkills,
+            CandidateMatchStatus shortlistStatus) {
     }
 }

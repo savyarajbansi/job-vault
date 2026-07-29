@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { getSeekerMatches, getSeekerResumeHistory, getMyApplications } from "../api/seeker";
+import { getSeekerMatches, getSeekerProfile, getMyApplications } from "../api/seeker";
 import type { SeekerMatchItem } from "../api/seeker";
 import type { ApplicationStatus } from "../api/employer";
 import { formatSalaryRange } from "../api/employer";
@@ -11,6 +11,7 @@ import { Alert, Badge, Card, Spinner } from "../components/ui";
 import { useAuth } from "../api/authContext";
 import PageLoader from "../components/PageLoader";
 import { formatScore, isStrongMatch } from "../utils/score";
+import { WORK_MODE_LABELS } from "../api/matching";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
@@ -180,7 +181,7 @@ function MatchCard({ item }: { item: SeekerMatchItem }) {
           )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
             {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
-            {item.job.remoteEligible && <Badge tone="accent">Remote</Badge>}
+            {item.job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[item.job.workMode]}</Badge>}
             {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
             <Badge tone={scoreTone(item.score)}>
               {isStrongMatch(item.score)
@@ -253,14 +254,10 @@ export default function SeekerDashboard() {
     const loadHistory = async () => {
       setHistoryLoading(true);
       try {
-        const result = await getSeekerResumeHistory({ limit: 20, offset: 0 });
-        const parsed = result.items.find((i) => i.status === "PARSED");
-        setResumeStatus(parsed ? "Ready" : result.items.length > 0 ? "Not parsed" : "None");
-        if (parsed) {
-          setSkillCount(parsed.inferredSkills.length);
-        } else {
-          setSkillCount(0);
-        }
+        const profile = await getSeekerProfile();
+        const resume = profile.resume;
+        setResumeStatus(resume ? (resume.status === "PARSED" ? "Ready" : "Not parsed") : "None");
+        setSkillCount(resume?.skills.length ?? 0);
       } catch {
         setResumeStatus("—");
         setSkillCount(0);

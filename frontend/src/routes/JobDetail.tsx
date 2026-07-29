@@ -11,6 +11,7 @@ import { getPublicJob } from "../api/jobs";
 import { ApiResponseError } from "../api/client";
 import { useAuth } from "../api/authContext";
 import { Alert, Badge, Button, Card, Divider, Spinner } from "../components/ui";
+import { WORK_MODE_LABELS, SECTOR_OPTIONS } from "../api/matching";
 import JobApplyPanel from "../components/JobApplyPanel";
 import PageLoader from "../components/PageLoader";
 
@@ -135,7 +136,8 @@ export default function JobDetailPage() {
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
             {job.location && <Badge tone="neutral">{job.location}</Badge>}
-            {job.remoteEligible && <Badge tone="accent">Remote eligible</Badge>}
+            {job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[job.workMode]}</Badge>}
+            {job.sectorTags.map((sector) => <Badge key={sector} tone="neutral">{SECTOR_OPTIONS.find((option) => option.value === sector)?.label ?? sector}</Badge>)}
             {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
             {job.minExperienceYears != null && (
               <Badge tone="neutral">{job.minExperienceYears}+ yrs experience</Badge>

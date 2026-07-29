@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { getPublicJobs, getTrendingSkills } from "../api/jobs";
 import type { TrendingSkill } from "../api/jobs";
 import { formatSalaryRange } from "../api/employer";
+import { WORK_MODE_LABELS } from "../api/matching";
 import type { JobSummary } from "../api/employer";
 import { useAuth } from "../api/authContext";
 import { Alert, Badge, Card, Input, Spinner } from "../components/ui";
@@ -245,7 +246,7 @@ export default function BrowseJobs() {
                         )}
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.6rem" }}>
                           <Badge tone="neutral">{job.location ?? "Location not set"}</Badge>
-                          {job.remoteEligible && <Badge tone="accent">Remote eligible</Badge>}
+                          {job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[job.workMode]}</Badge>}
                           {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
                           {job.minExperienceYears != null && (
                             <Badge tone="neutral">{job.minExperienceYears}+ yrs experience</Badge>
