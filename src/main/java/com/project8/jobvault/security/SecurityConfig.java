@@ -41,7 +41,6 @@ public class SecurityConfig {
                                                                 "/api/auth/refresh")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
-                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/api/employer/**").hasRole("EMPLOYER")
                                                 .requestMatchers("/api/seeker/**").hasRole("JOB_SEEKER")
                                                 .anyRequest().authenticated())

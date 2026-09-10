@@ -1,7 +1,6 @@
 package com.project8.jobvault.schema;
 
 import com.project8.jobvault.applications.ApplicationStatus;
-import com.project8.jobvault.jobs.JobModerationAction;
 import com.project8.jobvault.jobs.JobStatus;
 import com.project8.jobvault.resumes.ResumeProcessingStatus;
 import java.util.List;
@@ -32,10 +31,4 @@ class StatusEnumsTest {
         }
     }
 
-    @Test
-    void jobModerationActionIncludesExpectedActions() {
-        for (String name : List.of("APPROVED", "REJECTED", "DISABLED")) {
-            assertNotNull(JobModerationAction.valueOf(name));
-        }
-    }
 }

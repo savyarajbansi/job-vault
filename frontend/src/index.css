@@ -367,8 +367,7 @@ button { font-family: var(--font-body); cursor: pointer; }
   align-items: start;
 }
 .profile-sheet {
-  max-width: 860px;
-  margin: 0 auto;
+  width: 100%;
   padding: var(--space-8);
 }
 .profile-sheet__header {

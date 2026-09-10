@@ -38,7 +38,7 @@ function lifecycleMessage(
   if (error instanceof ApiResponseError && error.response.status === 409) {
     if (action === "publish") return "This job is already published.";
     if (action === "disable") return "This job is already disabled.";
-    return "This job cannot be reactivated right now. It may have been blocked by moderation.";
+    return "This job cannot be reactivated right now.";
   }
   return "Action failed. Please try again.";
 }

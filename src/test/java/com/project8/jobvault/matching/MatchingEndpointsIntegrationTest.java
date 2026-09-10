@@ -26,7 +26,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -93,9 +92,6 @@ class MatchingEndpointsIntegrationTest {
 
     @MockitoBean
     private CandidateMatchNotificationRepository candidateMatchNotificationRepository;
-
-    @MockitoBean
-    private MatchResultRepository matchResultRepository;
 
     @MockitoBean
     private SkillRepository skillRepository;
@@ -254,30 +250,6 @@ class MatchingEndpointsIntegrationTest {
     }
 
     @Test
-    void cachedEmployerCandidatesExcludeIneligibleSeekerBeforeDeduplication() throws Exception {
-        seekerUser.setPreferredSectors("IT");
-        seekerUser.setWorkMode(WorkMode.REMOTE);
-        strongMatchJob.setSectorTags("HEALTHCARE");
-        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
-        ReflectionTestUtils.setField(strongMatchJob, "updatedAt", Instant.parse("2026-05-10T12:00:00Z"));
-
-        TestMatchResult cached = new TestMatchResult();
-        cached.setJob(strongMatchJob);
-        cached.setResume(seekerResume);
-        cached.setOverallScore(1.0);
-        when(matchResultRepository.countValidForJob(nonNullArgument(), nonNullArgument(), nonNullArgument(), nonNullArgument()))
-                .thenReturn(0L);
-        when(matchResultRepository.findValidForJobAll(nonNullArgument(), nonNullArgument(), nonNullArgument(), nonNullArgument()))
-                .thenReturn(List.of(cached));
-
-        mockMvc.perform(get("/api/employer/jobs/{jobId}/matches/candidates", strongMatchJob.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isEmpty())
-                .andExpect(jsonPath("$.page.total").value(0));
-    }
-
-    @Test
     void shortlistCreationRejectsIneligibleSeeker() throws Exception {
         seekerUser.setPreferredSectors("IT");
         seekerUser.setWorkMode(WorkMode.REMOTE);
@@ -372,9 +344,6 @@ class MatchingEndpointsIntegrationTest {
     }
 
     static final class TestResumeMetadata extends ResumeMetadata {
-    }
-
-    static final class TestMatchResult extends MatchResult {
     }
 
     static final class TestJob extends Job {

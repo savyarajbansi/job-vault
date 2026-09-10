@@ -16,23 +16,25 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SkillCatalog {
-    private final List<SkillMatcher> matchers;
     private final Map<String, String> canonicalByTerm;
+    private final Pattern extractionPattern;
 
     public SkillCatalog(@Value("${jobvault.parsing.skill-dictionary}") String resourcePath) {
-        this.matchers = List.copyOf(loadMatchers(resourcePath));
+        List<SkillDefinition> definitions = loadMatchers(resourcePath);
         Map<String, String> aliases = new HashMap<>();
-        for (SkillMatcher matcher : matchers) {
-            for (String term : matcher.terms()) {
-                aliases.put(term, matcher.canonical());
+        for (SkillDefinition definition : definitions) {
+            for (String term : definition.terms()) {
+                aliases.put(term, definition.canonical());
             }
         }
         this.canonicalByTerm = Map.copyOf(aliases);
+        this.extractionPattern = buildExtractionPattern(this.canonicalByTerm.keySet());
     }
 
     public List<String> extractSkills(String text) {
@@ -43,25 +45,13 @@ public class SkillCatalog {
         if (normalized.isBlank()) {
             return List.of();
         }
-        List<SkillMatch> candidates = new ArrayList<>();
-        for (SkillMatcher matcher : matchers) {
-            matcher.findMatches(normalized, candidates);
-        }
-        candidates.sort(Comparator.comparingInt(SkillMatch::start)
-                .thenComparing(Comparator.comparingInt(SkillMatch::length).reversed()));
-
-        List<SkillMatch> accepted = new ArrayList<>();
-        for (SkillMatch candidate : candidates) {
-            boolean overlaps = accepted.stream().anyMatch(existing ->
-                    candidate.start() < existing.end() && existing.start() < candidate.end());
-            if (!overlaps) {
-                accepted.add(candidate);
-            }
-        }
-
         LinkedHashSet<String> unique = new LinkedHashSet<>();
-        for (SkillMatch match : accepted) {
-            unique.add(match.canonical());
+        var matcher = extractionPattern.matcher(normalized);
+        while (matcher.find()) {
+            String canonical = canonicalByTerm.get(matcher.group(1));
+            if (canonical != null) {
+                unique.add(canonical);
+            }
         }
         return List.copyOf(unique);
     }
@@ -79,9 +69,9 @@ public class SkillCatalog {
         return canonicalByTerm.getOrDefault(normalized, normalized);
     }
 
-    private static List<SkillMatcher> loadMatchers(String resourcePath) {
+    private static List<SkillDefinition> loadMatchers(String resourcePath) {
         Objects.requireNonNull(resourcePath, "resourcePath");
-        List<SkillMatcher> loaded = new ArrayList<>();
+        List<SkillDefinition> loaded = new ArrayList<>();
         try (InputStream inputStream = openResource(resourcePath);
                 BufferedReader reader = new BufferedReader(
                         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
@@ -91,9 +81,9 @@ public class SkillCatalog {
                 if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                     continue;
                 }
-                SkillMatcher matcher = parseLine(trimmed);
-                if (matcher != null) {
-                    loaded.add(matcher);
+                SkillDefinition definition = parseLine(trimmed);
+                if (definition != null) {
+                    loaded.add(definition);
                 }
             }
         } catch (IOException ex) {
@@ -102,7 +92,7 @@ public class SkillCatalog {
         return loaded;
     }
 
-    private static SkillMatcher parseLine(String line) {
+    private static SkillDefinition parseLine(String line) {
         String[] parts = line.split("\\|");
         if (parts.length == 0) {
             return null;
@@ -111,23 +101,33 @@ public class SkillCatalog {
         if (canonical.isEmpty()) {
             return null;
         }
-        List<Pattern> patterns = new ArrayList<>();
         List<String> terms = new ArrayList<>();
         terms.add(canonical);
-        patterns.add(buildPattern(canonical));
         for (int i = 1; i < parts.length; i++) {
             String synonym = normalizeTerm(parts[i]);
             if (!synonym.isEmpty() && !synonym.equals(canonical)) {
                 terms.add(synonym);
-                patterns.add(buildPattern(synonym));
             }
         }
-        return new SkillMatcher(canonical, terms, patterns);
+        return new SkillDefinition(canonical, terms);
     }
 
-    private static Pattern buildPattern(String term) {
-        String escaped = Pattern.quote(term);
-        return Pattern.compile("(?<![a-z0-9])" + escaped + "(?![a-z0-9])");
+    private static Pattern buildExtractionPattern(Iterable<String> terms) {
+        List<String> orderedTerms = new ArrayList<>();
+        for (String term : terms) {
+            orderedTerms.add(term);
+        }
+        orderedTerms.sort(Comparator.comparingInt(String::length).reversed().thenComparing(String::compareTo));
+        if (orderedTerms.isEmpty()) {
+            // The dictionary is expected to contain entries, but keeping a
+            // non-matching pattern makes an empty/misconfigured dictionary a
+            // safe, predictable no-op.
+            return Pattern.compile("(?!x)x");
+        }
+        String alternatives = orderedTerms.stream()
+                .map(Pattern::quote)
+                .collect(Collectors.joining("|"));
+        return Pattern.compile("(?<![a-z0-9])(" + alternatives + ")(?![a-z0-9])");
     }
 
     private static String normalizeText(String text) {
@@ -168,20 +168,6 @@ public class SkillCatalog {
         return Files.newInputStream(Path.of(resourcePath));
     }
 
-    private record SkillMatcher(String canonical, List<String> terms, List<Pattern> patterns) {
-        private void findMatches(String text, List<SkillMatch> output) {
-            for (Pattern pattern : patterns) {
-                var matcher = pattern.matcher(text);
-                while (matcher.find()) {
-                    output.add(new SkillMatch(canonical, matcher.start(), matcher.end()));
-                }
-            }
-        }
-    }
-
-    private record SkillMatch(String canonical, int start, int end) {
-        private int length() {
-            return end - start;
-        }
+    private record SkillDefinition(String canonical, List<String> terms) {
     }
 }

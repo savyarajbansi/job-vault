@@ -3,9 +3,6 @@ package com.project8.jobvault.resumes;
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.parsing.ParseErrorException;
 import com.project8.jobvault.parsing.ParseResult;
-import com.project8.jobvault.parsing.ResumeParseAttempt;
-import com.project8.jobvault.parsing.ResumeParseAttemptRepository;
-import com.project8.jobvault.parsing.ResumeParseAttemptStatus;
 import com.project8.jobvault.parsing.ResumeParser;
 import com.project8.jobvault.users.UserAccount;
 import com.project8.jobvault.users.UserAccountRepository;
@@ -13,13 +10,11 @@ import com.project8.jobvault.ratelimit.RateLimitService;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -45,7 +40,6 @@ public class ResumeUploadController {
     private final ResumeParser resumeParser;
     private final Clock clock;
     private final DataSize maxFileSize;
-    private final ObjectProvider<ResumeParseAttemptRepository> resumeParseAttemptRepositoryProvider;
     private final RateLimitService rateLimitService;
 
     public ResumeUploadController(
@@ -54,7 +48,6 @@ public class ResumeUploadController {
             ResumeStorageService storageService,
             ResumeParser resumeParser,
             Clock clock,
-            ObjectProvider<ResumeParseAttemptRepository> resumeParseAttemptRepositoryProvider,
             RateLimitService rateLimitService,
             @Value("${spring.servlet.multipart.max-file-size:10MB}") DataSize maxFileSize) {
         this.resumeMetadataRepository = resumeMetadataRepository;
@@ -62,7 +55,6 @@ public class ResumeUploadController {
         this.storageService = storageService;
         this.resumeParser = resumeParser;
         this.clock = clock;
-        this.resumeParseAttemptRepositoryProvider = resumeParseAttemptRepositoryProvider;
         this.rateLimitService = rateLimitService;
         this.maxFileSize = maxFileSize;
     }
@@ -87,11 +79,7 @@ public class ResumeUploadController {
             saved = resumeMetadataRepository.save(saved);
         }
 
-        long parseStart = 0L;
-        boolean parseStarted = false;
         try {
-            parseStart = System.nanoTime();
-            parseStarted = true;
             ParseResult result = resumeParser.parse(file.getBytes());
             // Do not touch the current metadata or file until the replacement parses.
             String storageLocation = storageService.store(saved.getId(), file);
@@ -107,9 +95,7 @@ public class ResumeUploadController {
             saved.setFailureCode(null);
             saved.setProcessingStatus(ResumeProcessingStatus.PARSED);
             saved = resumeMetadataRepository.save(saved);
-            recordParseAttempt(saved, ResumeParseAttemptStatus.SUCCESS, null, parseStart, result);
         } catch (ParseErrorException ex) {
-            recordParseAttempt(saved, ResumeParseAttemptStatus.FAILED, ex.getCode(), parseStart, null);
             if (existing == null) {
                 saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
                 saved.setFailureCode(ex.getCode());
@@ -117,9 +103,6 @@ public class ResumeUploadController {
             }
             throw ex;
         } catch (IOException ex) {
-            if (parseStarted) {
-                recordParseAttempt(saved, ResumeParseAttemptStatus.FAILED, UploadErrorCodes.UPLOAD_FAILED, parseStart, null);
-            }
             if (existing == null) {
                 saved.setProcessingStatus(ResumeProcessingStatus.FAILED);
                 saved.setFailureCode(UploadErrorCodes.UPLOAD_FAILED);
@@ -207,33 +190,4 @@ public class ResumeUploadController {
                 .collect(Collectors.joining(","));
     }
 
-    private void recordParseAttempt(
-            ResumeMetadata resume,
-            ResumeParseAttemptStatus status,
-            String errorCode,
-            long parseStartNanos,
-            ParseResult result) {
-        ResumeParseAttemptRepository repository = resumeParseAttemptRepositoryProvider.getIfAvailable();
-        if (repository == null || resume == null) {
-            return;
-        }
-        ResumeParseAttempt attempt = new ResumeParseAttempt();
-        attempt.setResume(resume);
-        attempt.setStatus(status);
-        attempt.setErrorCode(errorCode);
-        attempt.setDurationMs(toDurationMs(parseStartNanos));
-        if (result != null) {
-            String text = result.extractedText();
-            List<String> skills = result.inferredSkills();
-            attempt.setExtractedTextLength(text == null ? 0 : text.length());
-            attempt.setInferredSkillCount(skills == null ? 0 : skills.size());
-        }
-        repository.save(attempt);
-    }
-
-    private int toDurationMs(long startNanos) {
-        long elapsedNanos = System.nanoTime() - startNanos;
-        long millis = Duration.ofNanos(Math.max(0L, elapsedNanos)).toMillis();
-        return millis > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) millis;
-    }
 }

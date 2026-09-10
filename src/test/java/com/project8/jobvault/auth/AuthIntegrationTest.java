@@ -128,7 +128,6 @@ class AuthIntegrationTest {
 
     private UserAccount seekerUser;
     private UserAccount employerUser;
-    private UserAccount adminUser;
 
     @BeforeEach
     void setUp() {
@@ -140,15 +139,12 @@ class AuthIntegrationTest {
 
         roleByName.put("JOB_SEEKER", buildRole("JOB_SEEKER"));
         roleByName.put("EMPLOYER", buildRole("EMPLOYER"));
-        roleByName.put("ADMIN", buildRole("ADMIN"));
 
         seekerUser = buildUser("user@example.com", "JOB_SEEKER");
         employerUser = buildUser("employer@example.com", "EMPLOYER");
-        adminUser = buildUser("admin@example.com", "ADMIN");
 
         indexUser(seekerUser);
         indexUser(employerUser);
-        indexUser(adminUser);
 
         when(userAccountRepository.findByEmail(anyString())).thenAnswer(invocation -> {
             String email = invocation.getArgument(0);
@@ -273,7 +269,7 @@ class AuthIntegrationTest {
                           "email":"another@example.com",
                           "password":"password123",
                           "displayName":"Another",
-                          "role":"ADMIN"
+                          "role":"UNKNOWN"
                         }
                         """))
                 .andExpect(status().isBadRequest())
@@ -419,17 +415,6 @@ class AuthIntegrationTest {
     void roleProtectedEndpointsAllowMatchingRoleAndDenyMismatchedRole() throws Exception {
         String seekerAccessToken = extractAccessToken(performLogin("user@example.com"));
         String employerAccessToken = extractAccessToken(performLogin("employer@example.com"));
-        String adminAccessToken = extractAccessToken(performLogin("admin@example.com"));
-
-        mockMvc.perform(get("/api/admin/test")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + seekerAccessToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR_AUTH_002"))
-                .andExpect(jsonPath("$.details.reason").value("insufficient_role"));
-
-        mockMvc.perform(get("/api/admin/test")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
-                .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/employer/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + seekerAccessToken))
@@ -646,11 +631,6 @@ class AuthIntegrationTest {
         @RestController
         @RequestMapping("/api")
         static class RoleProtectedTestEndpoints {
-            @GetMapping("/admin/test")
-            Map<String, String> adminEndpoint() {
-                return Map.of("status", "admin-ok");
-            }
-
             @GetMapping("/employer/test")
             Map<String, String> employerEndpoint() {
                 return Map.of("status", "employer-ok");

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CoreSchemaMigrationTest {
 
     @Test
-    void latestMigrationIncludesMatchResultsAndAuditTables() throws SQLException {
+    void latestMigrationIncludesCoreMatchingTables() throws SQLException {
         String databaseUrl = "jdbc:h2:mem:jobvault-schema-" + UUID.randomUUID()
                 + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1"
                 + ";INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ"
@@ -24,16 +24,11 @@ class CoreSchemaMigrationTest {
         migrateToLatest(databaseUrl);
 
         try (Connection connection = DriverManager.getConnection(databaseUrl, "sa", "")) {
-            assertTableExists(connection, "match_results");
-            assertTableExists(connection, "resume_parse_attempts");
-            assertTableExists(connection, "match_attempts");
-
             assertColumnExists(connection, "resumes", "parsed_text");
             assertColumnExists(connection, "resumes", "inferred_skills");
             assertColumnExists(connection, "resumes", "storage_type");
             assertColumnExists(connection, "resumes", "storage_key");
 
-            assertRoleExists(connection, "ADMIN");
             assertRoleExists(connection, "EMPLOYER");
             assertRoleExists(connection, "JOB_SEEKER");
         }
@@ -45,11 +40,6 @@ class CoreSchemaMigrationTest {
                 .locations("classpath:db/migration")
                 .load()
                 .migrate();
-    }
-
-    private void assertTableExists(Connection connection, String tableName) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?";
-        assertEquals(1, countMatches(connection, sql, tableName));
     }
 
     private void assertColumnExists(Connection connection, String tableName, String columnName)

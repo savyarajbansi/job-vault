@@ -11,8 +11,7 @@ package com.project8.jobvault.matching;
  * - The rebuild runs on a separate async thread, so the HTTP response is
  *   returned to the client before the corpus recomputation begins.
  *
- * @param reason a short human-readable label for log/debug output,
- *               e.g. "job-published" or "job-approved".
+ * @param reason a short human-readable label for log/debug output.
  */
 public record CorpusRebuildEvent(String reason) {
 }

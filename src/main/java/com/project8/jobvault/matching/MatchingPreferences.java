@@ -20,6 +20,14 @@ public final class MatchingPreferences {
                 .map(String::trim)
                 .map(value -> value.toUpperCase(Locale.ROOT))
                 .filter(value -> !value.isEmpty())
+                .filter(value -> {
+                    try {
+                        SectorCode.valueOf(value);
+                        return true;
+                    } catch (IllegalArgumentException ex) {
+                        return false;
+                    }
+                })
                 .distinct()
                 .toList();
     }

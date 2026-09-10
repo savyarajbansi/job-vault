@@ -152,9 +152,6 @@ export default function App() {
           }
         />
 
-        {/* Legacy redirects */}
-        <Route path="admin/metrics" element={<Navigate to="/" replace />} />
-
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

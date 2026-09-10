@@ -79,20 +79,6 @@ public class Job {
     @Column(nullable = false, length = 20)
     private JobStatus status = JobStatus.DRAFT;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "moderation_action", length = 20)
-    private JobModerationAction moderationAction;
-
-    @Column(name = "moderation_reason", columnDefinition = "text")
-    private String moderationReason;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "moderated_by")
-    private UserAccount moderatedBy;
-
-    @Column(name = "moderated_at")
-    private Instant moderatedAt;
-
     @Column(name = "published_at")
     private Instant publishedAt;
 
@@ -245,38 +231,6 @@ public class Job {
 
     public void setStatus(JobStatus status) {
         this.status = status;
-    }
-
-    public JobModerationAction getModerationAction() {
-        return moderationAction;
-    }
-
-    public void setModerationAction(JobModerationAction moderationAction) {
-        this.moderationAction = moderationAction;
-    }
-
-    public String getModerationReason() {
-        return moderationReason;
-    }
-
-    public void setModerationReason(String moderationReason) {
-        this.moderationReason = moderationReason;
-    }
-
-    public UserAccount getModeratedBy() {
-        return moderatedBy;
-    }
-
-    public void setModeratedBy(UserAccount moderatedBy) {
-        this.moderatedBy = moderatedBy;
-    }
-
-    public Instant getModeratedAt() {
-        return moderatedAt;
-    }
-
-    public void setModeratedAt(Instant moderatedAt) {
-        this.moderatedAt = moderatedAt;
     }
 
     public Instant getPublishedAt() {

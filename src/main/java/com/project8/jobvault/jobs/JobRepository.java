@@ -35,48 +35,6 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
     Optional<Job> findByIdAndStatus(UUID id, JobStatus status);
 
-    // ── Admin moderation mutations ─────────────────────────────────────────────
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update Job j
-            set j.status = com.project8.jobvault.jobs.JobStatus.ACTIVE,
-                j.moderationAction = com.project8.jobvault.jobs.JobModerationAction.APPROVED,
-                j.moderationReason = null,
-                j.moderatedBy = :moderatedBy,
-                j.moderatedAt = :moderatedAt,
-                j.publishedAt = :publishedAt,
-                j.disabledAt = null
-            where j.id = :jobId
-              and (j.status = com.project8.jobvault.jobs.JobStatus.DRAFT
-                or j.status = com.project8.jobvault.jobs.JobStatus.DISABLED)
-            """)
-    int approveForAdmin(
-            @Param("jobId") UUID jobId,
-            @Param("moderatedBy") UserAccount moderatedBy,
-            @Param("moderatedAt") Instant moderatedAt,
-            @Param("publishedAt") Instant publishedAt);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update Job j
-            set j.status = com.project8.jobvault.jobs.JobStatus.DISABLED,
-                j.moderationAction = :moderationAction,
-                j.moderationReason = :moderationReason,
-                j.moderatedBy = :moderatedBy,
-                j.moderatedAt = :moderatedAt,
-                j.disabledAt = :disabledAt
-            where j.id = :jobId
-              and j.status = com.project8.jobvault.jobs.JobStatus.ACTIVE
-            """)
-    int moderateActiveToDisabled(
-            @Param("jobId") UUID jobId,
-            @Param("moderationAction") JobModerationAction moderationAction,
-            @Param("moderationReason") String moderationReason,
-            @Param("moderatedBy") UserAccount moderatedBy,
-            @Param("moderatedAt") Instant moderatedAt,
-            @Param("disabledAt") Instant disabledAt);
-
     // ── Employer lifecycle mutations ───────────────────────────────────────────
 
     @Transactional
@@ -120,10 +78,6 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             where j.id = :jobId
               and j.employer.id = :employerId
               and j.status = com.project8.jobvault.jobs.JobStatus.DISABLED
-              and (
-            j.moderationAction is null
-            or j.moderationAction = com.project8.jobvault.jobs.JobModerationAction.APPROVED
-              )
             """)
     int transitionDisabledToActive(
             @Param("jobId") UUID jobId,

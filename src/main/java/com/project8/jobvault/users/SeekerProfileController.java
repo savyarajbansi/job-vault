@@ -100,14 +100,17 @@ public class SeekerProfileController {
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .toList();
-        for (String sector : normalized) {
-            try {
-                SectorCode.valueOf(sector);
-            } catch (IllegalArgumentException ex) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported sector: " + sector);
-            }
-        }
-        return MatchingPreferences.joinSectors(normalized);
+        List<String> valid = normalized.stream()
+                .filter(sector -> {
+                    try {
+                        SectorCode.valueOf(sector);
+                        return true;
+                    } catch (IllegalArgumentException ex) {
+                        return false;
+                    }
+                })
+                .toList();
+        return MatchingPreferences.joinSectors(valid);
     }
 
     private List<String> normalizeSkills(List<String> skills) {

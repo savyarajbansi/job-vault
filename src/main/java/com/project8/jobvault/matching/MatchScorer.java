@@ -6,9 +6,11 @@ import com.project8.jobvault.parsing.SkillCatalog;
 import com.project8.jobvault.resumes.ResumeMetadata;
 import com.project8.jobvault.users.UserAccount;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -30,23 +32,60 @@ public class MatchScorer {
     }
 
     public ScoredMatch score(ResumeMetadata resume, Job job, UserAccount seeker) {
+        return score(prepareResume(resume), job, seeker);
+    }
+
+    /**
+     * Prepares the resume-only portions of a score once. Ranking a seeker
+     * against many jobs used to tokenize and vectorize the same resume for
+     * every job, and could even observe a different IDF snapshot mid-request.
+     */
+    public PreparedResume prepareResume(ResumeMetadata resume) {
+        return prepareResume(resume, newContext());
+    }
+
+    /** Captures the immutable corpus data used by all scores in one request. */
+    public ScoringContext newContext() {
+        return new ScoringContext(corpusIdfService.getSnapshot().idfByTerm());
+    }
+
+    public PreparedResume prepareResume(ResumeMetadata resume, ScoringContext context) {
+        Objects.requireNonNull(context, "context");
         List<String> resumeTokens = textTokenizer.tokenize(orEmpty(resume == null ? null : resume.getParsedText()));
+        Set<String> resumeSkills = splitSkills(resume == null ? null : resume.getInferredSkills());
+        Map<String, Double> idf = context.idfByTerm();
+        Map<String, Double> resumeVector = idf.isEmpty()
+                ? Map.of()
+                : new TfIdfVectorizer(idf).vectorize(resumeTokens);
+        return new PreparedResume(resumeTokens, resumeSkills, idf, resumeVector);
+    }
+
+    public ScoredMatch score(PreparedResume prepared, Job job, UserAccount seeker) {
+        Objects.requireNonNull(prepared, "prepared");
+        List<String> resumeTokens = prepared.tokens();
         String jobText = ((job == null ? null : job.getTitle()) == null ? "" : job.getTitle())
                 + " " + orEmpty(job == null ? null : job.getDescription());
         List<String> jobTokens = textTokenizer.tokenize(jobText);
 
-        CorpusIdfService.CorpusSnapshot snapshot = corpusIdfService.getSnapshot();
-        var idf = snapshot.idfByTerm();
+        Map<String, Double> idf = prepared.idfByTerm();
         if (idf.isEmpty()) {
             idf = InverseDocumentFrequency.compute(List.of(resumeTokens, jobTokens));
         }
         TfIdfVectorizer vectorizer = new TfIdfVectorizer(idf);
+        Map<String, Double> resumeVector = prepared.resumeVector().isEmpty()
+                ? vectorizer.vectorize(resumeTokens)
+                : prepared.resumeVector();
+        Map<String, Double> jobVector = vectorizer.vectorize(jobTokens);
         double cosine = CosineSimilarity.compute(
-                vectorizer.vectorize(resumeTokens), vectorizer.vectorize(jobTokens));
-        boolean cosineAvailable = !resumeTokens.isEmpty() && !jobTokens.isEmpty();
+                resumeVector, jobVector);
+        // A token list alone is not enough: when the corpus does not contain
+        // a resume term, vectorization can legitimately produce an empty
+        // vector. In that case cosine similarity should not dilute the other
+        // available factors.
+        boolean cosineAvailable = !resumeVector.isEmpty() && !jobVector.isEmpty();
 
         Set<String> requiredSkills = requiredSkills(job);
-        Set<String> resumeSkills = splitSkills(resume == null ? null : resume.getInferredSkills());
+        Set<String> resumeSkills = prepared.skills();
         int overlapCount = (int) requiredSkills.stream().filter(resumeSkills::contains).count();
         boolean skillsAvailable = !requiredSkills.isEmpty();
         double skillsOverlap = skillsAvailable ? (double) overlapCount / requiredSkills.size() : 0.0;
@@ -164,6 +203,25 @@ public class MatchScorer {
     }
 
     private record LocationResult(double value, boolean available) {
+    }
+
+    public record PreparedResume(
+            List<String> tokens,
+            Set<String> skills,
+            Map<String, Double> idfByTerm,
+            Map<String, Double> resumeVector) {
+        public PreparedResume {
+            tokens = tokens == null ? List.of() : List.copyOf(tokens);
+            skills = skills == null ? Set.of() : Collections.unmodifiableSet(new LinkedHashSet<>(skills));
+            idfByTerm = idfByTerm == null ? Map.of() : Map.copyOf(idfByTerm);
+            resumeVector = resumeVector == null ? Map.of() : Map.copyOf(resumeVector);
+        }
+    }
+
+    public record ScoringContext(Map<String, Double> idfByTerm) {
+        public ScoringContext {
+            idfByTerm = idfByTerm == null ? Map.of() : Map.copyOf(idfByTerm);
+        }
     }
 
 }

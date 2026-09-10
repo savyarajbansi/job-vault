@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -68,6 +69,7 @@ public class EmployerJobController {
     }
 
     @PostMapping
+    @Transactional
     public ResponseEntity<JobDetailResponse> create(
             @AuthenticationPrincipal JwtPrincipal principal,
             @Valid @RequestBody JobCreateRequest request) {
@@ -105,6 +107,7 @@ public class EmployerJobController {
     }
 
     @PatchMapping("/{jobId}")
+    @Transactional
     public ResponseEntity<JobDetailResponse> update(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId,
@@ -137,6 +140,7 @@ public class EmployerJobController {
     }
 
     @PostMapping("/{jobId}/publish")
+    @Transactional
     public ResponseEntity<JobDetailResponse> publish(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
@@ -154,6 +158,7 @@ public class EmployerJobController {
     }
 
     @PostMapping("/{jobId}/disable")
+    @Transactional
     public ResponseEntity<JobDetailResponse> disable(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
@@ -171,6 +176,7 @@ public class EmployerJobController {
     }
 
     @PostMapping("/{jobId}/reactivate")
+    @Transactional
     public ResponseEntity<JobDetailResponse> reactivate(
             @AuthenticationPrincipal JwtPrincipal principal,
             @PathVariable UUID jobId) {
@@ -342,13 +348,16 @@ public class EmployerJobController {
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .toList();
-        for (String value : normalized) {
-            try {
-                SectorCode.valueOf(value);
-            } catch (IllegalArgumentException ex) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported sector tag: " + value);
-            }
-        }
-        return MatchingPreferences.joinSectors(normalized);
+        List<String> valid = normalized.stream()
+                .filter(value -> {
+                    try {
+                        SectorCode.valueOf(value);
+                        return true;
+                    } catch (IllegalArgumentException ex) {
+                        return false;
+                    }
+                })
+                .toList();
+        return MatchingPreferences.joinSectors(valid);
     }
 }

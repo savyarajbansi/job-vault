@@ -45,7 +45,7 @@ public class CorpusIdfService {
     }
 
     @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onCorpusRebuildEvent(CorpusRebuildEvent event) {
         log.debug("Rebuilding IDF corpus after commit (reason: {})", event.reason());
         requestAsyncRebuild();
