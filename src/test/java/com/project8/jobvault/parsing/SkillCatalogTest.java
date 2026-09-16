@@ -27,6 +27,13 @@ class SkillCatalogTest {
     }
 
     @Test
+    void canonicalizesKnownAliasesForLexicalMatching() {
+        SkillCatalog catalog = new SkillCatalog("classpath:skills/skill-dictionary.txt");
+
+        assertEquals("javascript spring boot", catalog.canonicalizeText("JS Springboot"));
+    }
+
+    @Test
     void handlesHighlyRepetitiveShortTermsWithoutBuildingAnOccurrenceList() {
         SkillCatalog catalog = new SkillCatalog("classpath:skills/skill-dictionary.txt");
         String text = IntStream.range(0, 10_000)

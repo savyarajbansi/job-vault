@@ -13,7 +13,6 @@ import SeekerProfile from "./routes/SeekerProfile";
 import SeekerProfileView from "./routes/SeekerProfileView";
 import EmployerDashboard from "./routes/EmployerDashboard";
 import JobEditor from "./routes/JobEditor";
-import CandidateMatches from "./routes/CandidateMatches";
 import ApplicationReview from "./routes/ApplicationReview";
 import NotFound from "./routes/NotFound";
 import { Spinner } from "./components/ui";
@@ -132,14 +131,6 @@ export default function App() {
           element={
             <RequireRole role="EMPLOYER" fallback="/seeker">
               <JobEditor mode="edit" />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="employer/jobs/:jobId/matches"
-          element={
-            <RequireRole role="EMPLOYER" fallback="/seeker">
-              <CandidateMatches />
             </RequireRole>
           }
         />

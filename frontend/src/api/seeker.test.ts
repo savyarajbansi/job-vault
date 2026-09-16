@@ -38,8 +38,8 @@ describe("seeker api client", () => {
 
   it("loads seeker matches with limit and offset query params", async () => {
     vi.mocked(authorizedRequest).mockResolvedValue({
-      items: [],
-      page: { limit: 5, offset: 10, total: 0 }
+      items: [{ strongMatch: true }],
+      page: { limit: 5, offset: 10, total: 1 }
     });
 
     const result = await getSeekerMatches({ limit: 5, offset: 10 });
@@ -49,6 +49,7 @@ describe("seeker api client", () => {
       { method: "GET" }
     );
     expect(result.page.limit).toBe(5);
+    expect(result.items[0].strongMatch).toBe(true);
   });
 
   it("loads skill gaps for a selected job", async () => {

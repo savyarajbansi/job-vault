@@ -50,7 +50,7 @@ export default function SeekerProfileView() {
     <main className="page seeker-page">
       <div className="page-header">
         <div className="page-header__copy">
-          <Link to={jobId ? `/employer/jobs/${jobId}/matches` : "/seeker/profile"} style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>← Back</Link>
+          <Link to={jobId ? `/employer/jobs/${jobId}/applications` : "/seeker/profile"} style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>← Back</Link>
           <h1 style={{ marginTop: "0.75rem" }}>Seeker profile</h1>
           <p className="page-header__subtitle">The profile information shared for this matching workflow.</p>
         </div>

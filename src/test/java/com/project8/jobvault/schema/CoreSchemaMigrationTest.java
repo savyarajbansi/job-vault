@@ -31,6 +31,9 @@ class CoreSchemaMigrationTest {
 
             assertRoleExists(connection, "EMPLOYER");
             assertRoleExists(connection, "JOB_SEEKER");
+            assertRoleAbsent(connection, "ADMIN");
+            assertTableAbsent(connection, "candidate_match_notifications");
+            assertColumnAbsent(connection, "notifications", "candidate_match_notification_id");
         }
     }
 
@@ -57,6 +60,31 @@ class CoreSchemaMigrationTest {
     private void assertRoleExists(Connection connection, String roleName) throws SQLException {
         String sql = "SELECT COUNT(*) FROM roles WHERE name = ?";
         assertEquals(1, countMatches(connection, sql, roleName));
+    }
+
+    private void assertColumnAbsent(Connection connection, String tableName, String columnName)
+            throws SQLException {
+        String sql = """
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+                """;
+        assertEquals(0, countMatches(connection, sql, tableName, columnName));
+    }
+
+    private void assertTableAbsent(Connection connection, String tableName) throws SQLException {
+        String sql = """
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_NAME = ?
+                """;
+        assertEquals(0, countMatches(connection, sql, tableName));
+    }
+
+    private void assertRoleAbsent(Connection connection, String roleName) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM roles WHERE name = ?";
+        assertEquals(0, countMatches(connection, sql, roleName));
     }
 
     private int countMatches(Connection connection, String sql, String... args) throws SQLException {

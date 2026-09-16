@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   disableEmployerJob,
   formatSalaryRange,
@@ -45,6 +45,9 @@ function lifecycleMessage(
 
 export default function EmployerDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationNotice = (location.state as { notice?: unknown } | null)?.notice;
+  const notice = typeof navigationNotice === "string" ? navigationNotice : null;
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [detailsById, setDetailsById] = useState<Record<string, JobDetail>>({});
   const [loading, setLoading] = useState(true);
@@ -159,6 +162,11 @@ export default function EmployerDashboard() {
 
       {error && (
         <Alert tone={error.includes("session") ? "info" : "error"}>{error}</Alert>
+      )}
+      {notice && (
+        <div style={{ marginTop: "1rem" }}>
+          <Alert tone="success">{notice}</Alert>
+        </div>
       )}
       {actionError && (
         <div style={{ marginTop: "1rem" }}>
@@ -360,14 +368,6 @@ export default function EmployerDashboard() {
                     >
                       Edit
                     </Link>
-                    {job.status === "ACTIVE" && (
-                      <Link
-                        to={`/employer/jobs/${job.id}/matches`}
-                        style={{ color: "var(--accent)", fontSize: "0.875rem", fontWeight: 500 }}
-                      >
-                        View matches
-                      </Link>
-                    )}
                     {(job.status === "ACTIVE" || job.status === "DISABLED") && (
                       <Link
                         to={`/employer/jobs/${job.id}/applications`}
@@ -395,8 +395,8 @@ export default function EmployerDashboard() {
                 <strong>{jobs.length}</strong>
               </div>
               <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem", lineHeight: 1.6 }}>
-                Candidate matches appear on active jobs only. Application review lives on each
-                job's application view.
+                Application review lives on each job's application view. Seeker matching is
+                available from the seeker's dashboard.
               </p>
               <Button variant="ghost" onClick={() => void loadJobs()}>
                 Refresh jobs

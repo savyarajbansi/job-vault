@@ -55,6 +55,19 @@ public class TextTokenizer {
         return tokens;
     }
 
+    public List<String> tokenizeWithBigrams(String text) {
+        List<String> unigrams = tokenize(text);
+        if (unigrams.size() < 2) {
+            return unigrams;
+        }
+        List<String> tokens = new ArrayList<>(unigrams.size() * 2 - 1);
+        tokens.addAll(unigrams);
+        for (int i = 0; i < unigrams.size() - 1; i++) {
+            tokens.add(unigrams.get(i) + "_" + unigrams.get(i + 1));
+        }
+        return tokens;
+    }
+
     private static String normalize(String input) {
         String lowered = input.toLowerCase(Locale.ROOT);
         return NON_TOKEN.matcher(lowered).replaceAll(" ").trim();

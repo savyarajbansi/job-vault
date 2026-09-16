@@ -16,7 +16,7 @@ import { Button, Alert, Card, Badge, Spinner, ScoreBar, Icon } from "../componen
 import ApplicationStatusBadge from "../components/ApplicationStatusBadge";
 import PageLoader from "../components/PageLoader";
 import useApplicationAction from "../hooks/useApplicationAction";
-import { formatScore, isStrongMatch } from "../utils/score";
+import { formatScore } from "../utils/score";
 import { WORK_MODE_LABELS } from "../api/matching";
 
 const MATCHES_PER_PAGE = 10;
@@ -147,7 +147,7 @@ export default function SeekerMatches() {
         <div className="page-header__copy">
           <h1>Job Matches</h1>
           <p className="page-header__subtitle">
-            Ranked by resume content, required skills, experience, and location when those signals are available.
+            Ranked by BM25 keyword relevance, semantic similarity, experience, and location when those signals are available.
           </p>
         </div>
       </div>
@@ -208,7 +208,7 @@ export default function SeekerMatches() {
                         {item.job.location && <Badge tone="neutral">{item.job.location}</Badge>}
                         {item.job.workMode && <Badge tone="accent">{WORK_MODE_LABELS[item.job.workMode]}</Badge>}
                         {salaryLabel && <Badge tone="neutral">{salaryLabel}</Badge>}
-                        {isStrongMatch(item.score) ? (
+                        {item.strongMatch ? (
                           <Badge tone="success">Strong match</Badge>
                         ) : (
                           <Badge tone="neutral">{item.missingSkills.length} skill gaps</Badge>
@@ -417,8 +417,8 @@ export default function SeekerMatches() {
                   <h4 style={{ fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-muted)", marginBottom: "0.125rem" }}>
                     Match factors
                   </h4>
-                  <MatchFactorBar value={selected.factors.cosine} available={selected.factors.cosineAvailable} label="Content similarity" />
-                  <MatchFactorBar value={selected.factors.skillsOverlap} available={selected.factors.skillsAvailable} label="Skills overlap" />
+                  <MatchFactorBar value={selected.factors.bm25} available={selected.factors.bm25Available} label="BM25 keyword relevance" />
+                  <MatchFactorBar value={selected.factors.embedding} available={selected.factors.embeddingAvailable} label="Semantic similarity" />
                   <MatchFactorBar value={selected.factors.experience} available={selected.factors.experienceAvailable} label="Experience" />
                   <MatchFactorBar value={selected.factors.location} available={selected.factors.locationAvailable} label="Location" />
                 </div>
@@ -477,7 +477,7 @@ export default function SeekerMatches() {
                         <Icon name="check" size={14} />
                       </span>
                       <span style={{ fontSize: "0.875rem", color: "var(--success)" }}>
-                        {isStrongMatch(selected.score)
+                        {selected.strongMatch
                           ? "No skill gaps - strong match."
                           : "No skill gaps were detected."}
                       </span>

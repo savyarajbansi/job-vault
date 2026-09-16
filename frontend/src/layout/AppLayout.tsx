@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { getNotifications, getUnreadNotificationCount, markNotificationRead, NotificationItem } from "../api/notifications";
-import { acceptSeekerShortlist } from "../api/seeker";
 import { useAuth } from "../api/authContext";
 import { GlobalStyles, Badge, Button, Card, Spinner } from "../components/ui";
 
@@ -32,7 +31,6 @@ function NotificationBell() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [acceptingShortlist, setAcceptingShortlist] = useState<Record<string, boolean>>({});
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // ── Badge count: poll every 60 s while authenticated ────────────────────
@@ -115,22 +113,6 @@ function NotificationBell() {
   }
 
   const unread = count ?? 0;
-
-  const acceptOffer = async (item: NotificationItem) => {
-    if (!item.shortlistId) return;
-    setAcceptingShortlist((current) => ({ ...current, [item.id]: true }));
-    try {
-      await acceptSeekerShortlist(item.shortlistId);
-      setItems((current) => current.map((notification) => notification.id === item.id
-        ? { ...notification, shortlistStatus: "ACCEPTED", isRead: true }
-        : notification));
-      if (!item.isRead) setCount((current) => Math.max(0, (current ?? 0) - 1));
-    } catch {
-      setError("Could not accept this offer. Please try again.");
-    } finally {
-      setAcceptingShortlist((current) => ({ ...current, [item.id]: false }));
-    }
-  };
 
   return (
     <div ref={panelRef} style={{ position: "relative" }}>
@@ -240,20 +222,6 @@ function NotificationBell() {
                       {!item.isRead && <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>Unread</span>}
                     </div>
                 <p style={{ fontSize: "0.875rem", color: "var(--ink-2)", lineHeight: 1.5 }}>{item.message}</p>
-                    {item.type === "CANDIDATE_SHORTLISTED" && item.shortlistId && item.shortlistStatus === "PENDING" && (
-                      <Button
-                        size="sm"
-                        onClick={(event) => { event.stopPropagation(); void acceptOffer(item); }}
-                        loading={acceptingShortlist[item.id] === true}
-                        disabled={acceptingShortlist[item.id] === true}
-                        style={{ marginTop: "0.65rem" }}
-                      >
-                        Accept offer
-                      </Button>
-                    )}
-                    {item.type === "CANDIDATE_SHORTLISTED" && item.shortlistStatus === "ACCEPTED" && (
-                      <p style={{ marginTop: "0.65rem", fontSize: "0.8125rem", color: "var(--success)" }}>Offer accepted</p>
-                    )}
                   </div>
                 </div>
                 <p style={{ marginTop: "0.45rem", fontSize: "0.75rem", color: "var(--ink-muted)" }}>

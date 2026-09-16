@@ -9,7 +9,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -17,17 +16,25 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MatchScorer {
-    static final double COSINE_WEIGHT = 0.35;
-    static final double SKILL_WEIGHT = 0.3;
-    static final double EXPERIENCE_WEIGHT = 0.15;
-    static final double LOCATION_WEIGHT = 0.1;
+    public static final double STRONG_MATCH_THRESHOLD = 0.70;
+    public static final double BM25_WEIGHT = 0.45;
+    public static final double EMBEDDING_WEIGHT = 0.30;
+    public static final double EXPERIENCE_WEIGHT = 0.15;
+    public static final double LOCATION_WEIGHT = 0.10;
 
-    private final CorpusIdfService corpusIdfService;
+    private final MatchingCorpusService matchingCorpusService;
+    private final MatchingTextPreprocessor textPreprocessor;
+    private final EmbeddingService embeddingService;
     private final SkillCatalog skillCatalog;
-    private final TextTokenizer textTokenizer = new TextTokenizer(MatchingStopwords.DEFAULT);
 
-    public MatchScorer(CorpusIdfService corpusIdfService, SkillCatalog skillCatalog) {
-        this.corpusIdfService = corpusIdfService;
+    public MatchScorer(
+            MatchingCorpusService matchingCorpusService,
+            MatchingTextPreprocessor textPreprocessor,
+            EmbeddingService embeddingService,
+            SkillCatalog skillCatalog) {
+        this.matchingCorpusService = matchingCorpusService;
+        this.textPreprocessor = textPreprocessor;
+        this.embeddingService = embeddingService;
         this.skillCatalog = skillCatalog;
     }
 
@@ -35,60 +42,49 @@ public class MatchScorer {
         return score(prepareResume(resume), job, seeker);
     }
 
-    /**
-     * Prepares the resume-only portions of a score once. Ranking a seeker
-     * against many jobs used to tokenize and vectorize the same resume for
-     * every job, and could even observe a different IDF snapshot mid-request.
-     */
     public PreparedResume prepareResume(ResumeMetadata resume) {
         return prepareResume(resume, newContext());
     }
 
-    /** Captures the immutable corpus data used by all scores in one request. */
     public ScoringContext newContext() {
-        return new ScoringContext(corpusIdfService.getSnapshot().idfByTerm());
+        return new ScoringContext(matchingCorpusService.getSnapshot());
     }
 
     public PreparedResume prepareResume(ResumeMetadata resume, ScoringContext context) {
         Objects.requireNonNull(context, "context");
-        List<String> resumeTokens = textTokenizer.tokenize(orEmpty(resume == null ? null : resume.getParsedText()));
+        String resumeText = resume == null || resume.getParsedText() == null ? "" : resume.getParsedText();
+        List<String> resumeTokens = textPreprocessor.tokenize(resumeText);
         Set<String> resumeSkills = splitSkills(resume == null ? null : resume.getInferredSkills());
-        Map<String, Double> idf = context.idfByTerm();
-        Map<String, Double> resumeVector = idf.isEmpty()
-                ? Map.of()
-                : new TfIdfVectorizer(idf).vectorize(resumeTokens);
-        return new PreparedResume(resumeTokens, resumeSkills, idf, resumeVector);
+        double[] embedding = embeddingService.embed(resumeText).orElse(null);
+        return new PreparedResume(resumeTokens, resumeSkills, embedding, context.snapshot());
     }
 
     public ScoredMatch score(PreparedResume prepared, Job job, UserAccount seeker) {
         Objects.requireNonNull(prepared, "prepared");
-        List<String> resumeTokens = prepared.tokens();
-        String jobText = ((job == null ? null : job.getTitle()) == null ? "" : job.getTitle())
-                + " " + orEmpty(job == null ? null : job.getDescription());
-        List<String> jobTokens = textTokenizer.tokenize(jobText);
+        MatchingCorpusService.CorpusSnapshot snapshot = prepared.snapshot();
+        String jobText = jobText(job);
+        MatchingCorpusService.JobDocument corpusDocument = job == null || job.getId() == null
+                ? null
+                : snapshot.jobs().get(job.getId());
+        List<String> jobTokens = corpusDocument == null
+                ? textPreprocessor.tokenize(jobText)
+                : corpusDocument.tokens();
 
-        Map<String, Double> idf = prepared.idfByTerm();
-        if (idf.isEmpty()) {
-            idf = InverseDocumentFrequency.compute(List.of(resumeTokens, jobTokens));
+        Bm25Scorer.Result bm25 = Bm25Scorer.score(
+                prepared.tokens(), jobTokens, snapshot.idfByTerm(), snapshot.averageDocumentLength());
+        double embedding = 0.0;
+        boolean embeddingAvailable = false;
+        double[] jobEmbedding = corpusDocument == null ? null : corpusDocument.embedding();
+        if (prepared.embedding() != null && jobEmbedding != null) {
+            Double cosine = cosine(prepared.embedding(), jobEmbedding);
+            if (cosine != null) {
+                embedding = clamp01((cosine + 1.0) / 2.0);
+                embeddingAvailable = true;
+            }
         }
-        TfIdfVectorizer vectorizer = new TfIdfVectorizer(idf);
-        Map<String, Double> resumeVector = prepared.resumeVector().isEmpty()
-                ? vectorizer.vectorize(resumeTokens)
-                : prepared.resumeVector();
-        Map<String, Double> jobVector = vectorizer.vectorize(jobTokens);
-        double cosine = CosineSimilarity.compute(
-                resumeVector, jobVector);
-        // A token list alone is not enough: when the corpus does not contain
-        // a resume term, vectorization can legitimately produce an empty
-        // vector. In that case cosine similarity should not dilute the other
-        // available factors.
-        boolean cosineAvailable = !resumeVector.isEmpty() && !jobVector.isEmpty();
 
         Set<String> requiredSkills = requiredSkills(job);
         Set<String> resumeSkills = prepared.skills();
-        int overlapCount = (int) requiredSkills.stream().filter(resumeSkills::contains).count();
-        boolean skillsAvailable = !requiredSkills.isEmpty();
-        double skillsOverlap = skillsAvailable ? (double) overlapCount / requiredSkills.size() : 0.0;
         List<String> missingSkills = requiredSkills.stream()
                 .filter(skill -> !resumeSkills.contains(skill))
                 .sorted()
@@ -98,13 +94,13 @@ public class MatchScorer {
         LocationResult location = locationScore(seeker, job);
         double weightedTotal = 0.0;
         double activeWeight = 0.0;
-        if (cosineAvailable) {
-            weightedTotal += cosine * COSINE_WEIGHT;
-            activeWeight += COSINE_WEIGHT;
+        if (bm25.available()) {
+            weightedTotal += bm25.value() * BM25_WEIGHT;
+            activeWeight += BM25_WEIGHT;
         }
-        if (skillsAvailable) {
-            weightedTotal += skillsOverlap * SKILL_WEIGHT;
-            activeWeight += SKILL_WEIGHT;
+        if (embeddingAvailable) {
+            weightedTotal += embedding * EMBEDDING_WEIGHT;
+            activeWeight += EMBEDDING_WEIGHT;
         }
         if (experience.available()) {
             weightedTotal += experience.value() * EXPERIENCE_WEIGHT;
@@ -115,18 +111,20 @@ public class MatchScorer {
             activeWeight += LOCATION_WEIGHT;
         }
         double overall = activeWeight == 0.0 ? 0.0 : clamp01(weightedTotal / activeWeight);
+        boolean strongMatch = overall >= STRONG_MATCH_THRESHOLD && activeWeight > 0.0;
         return new ScoredMatch(
                 overall,
                 new MatchFactorBreakdown(
-                        cosine,
-                        skillsOverlap,
+                        bm25.value(),
+                        embedding,
                         experience.value(),
                         location.value(),
-                        cosineAvailable,
-                        skillsAvailable,
+                        bm25.available(),
+                        embeddingAvailable,
                         experience.available(),
                         location.available()),
-                missingSkills);
+                missingSkills,
+                strongMatch);
     }
 
     public String canonicalizeSkill(String value) {
@@ -154,23 +152,37 @@ public class MatchScorer {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    private String jobText(Job job) {
+        return (job == null || job.getTitle() == null ? "" : job.getTitle())
+                + " " + (job == null || job.getDescription() == null ? "" : job.getDescription());
+    }
+
+    private Double cosine(double[] left, double[] right) {
+        if (left.length == 0 || right.length == 0 || left.length != right.length) {
+            return null;
+        }
+        double dot = 0.0;
+        double leftNorm = 0.0;
+        double rightNorm = 0.0;
+        for (int i = 0; i < left.length; i++) {
+            dot += left[i] * right[i];
+            leftNorm += left[i] * left[i];
+            rightNorm += right[i] * right[i];
+        }
+        if (leftNorm == 0.0 || rightNorm == 0.0) {
+            return null;
+        }
+        return dot / Math.sqrt(leftNorm * rightNorm);
+    }
+
     private ExperienceResult experienceScore(UserAccount seeker, Job job) {
         Integer required = job == null ? null : job.getMinExperienceYears();
         Integer years = seeker == null ? null : seeker.getYearsExperience();
         if (required == null || required <= 0 || years == null) {
             return new ExperienceResult(0.0, false);
         }
-        if (years <= 0) {
-            return new ExperienceResult(0.0, true);
-        }
-        if (years >= required) {
-            return new ExperienceResult(1.0, true);
-        }
-        int partialThreshold = Math.max(0, required - 1);
-        if (years < partialThreshold) {
-            return new ExperienceResult(0.0, true);
-        }
-        return new ExperienceResult(0.5, true);
+        double ratio = (double) Math.max(0, years) / required;
+        return new ExperienceResult(Math.min(1.0, ratio), true);
     }
 
     private LocationResult locationScore(UserAccount seeker, Job job) {
@@ -191,10 +203,6 @@ public class MatchScorer {
         return new LocationResult(matches ? 1.0 : 0.0, true);
     }
 
-    private String orEmpty(String value) {
-        return value == null ? "" : value;
-    }
-
     private double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, value));
     }
@@ -208,20 +216,24 @@ public class MatchScorer {
     public record PreparedResume(
             List<String> tokens,
             Set<String> skills,
-            Map<String, Double> idfByTerm,
-            Map<String, Double> resumeVector) {
+            double[] embedding,
+            MatchingCorpusService.CorpusSnapshot snapshot) {
         public PreparedResume {
             tokens = tokens == null ? List.of() : List.copyOf(tokens);
             skills = skills == null ? Set.of() : Collections.unmodifiableSet(new LinkedHashSet<>(skills));
-            idfByTerm = idfByTerm == null ? Map.of() : Map.copyOf(idfByTerm);
-            resumeVector = resumeVector == null ? Map.of() : Map.copyOf(resumeVector);
+            embedding = embedding == null ? null : embedding.clone();
+            snapshot = snapshot == null ? MatchingCorpusService.CorpusSnapshot.empty() : snapshot;
+        }
+
+        @Override
+        public double[] embedding() {
+            return embedding == null ? null : embedding.clone();
         }
     }
 
-    public record ScoringContext(Map<String, Double> idfByTerm) {
+    public record ScoringContext(MatchingCorpusService.CorpusSnapshot snapshot) {
         public ScoringContext {
-            idfByTerm = idfByTerm == null ? Map.of() : Map.copyOf(idfByTerm);
+            snapshot = snapshot == null ? MatchingCorpusService.CorpusSnapshot.empty() : snapshot;
         }
     }
-
 }

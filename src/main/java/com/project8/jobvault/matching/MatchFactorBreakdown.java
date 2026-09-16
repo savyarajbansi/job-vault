@@ -1,20 +1,20 @@
 package com.project8.jobvault.matching;
 
 public record MatchFactorBreakdown(
-        double cosine,
-        double skillsOverlap,
+        double bm25,
+        double embedding,
         double experience,
         double location,
-        boolean cosineAvailable,
-        boolean skillsAvailable,
+        boolean bm25Available,
+        boolean embeddingAvailable,
         boolean experienceAvailable,
         boolean locationAvailable) {
 
     public MatchFactorBreakdown(
-            double cosine,
-            double skillsOverlap,
+            double bm25,
+            double embedding,
             double experience,
             double location) {
-        this(cosine, skillsOverlap, experience, location, true, true, true, true);
+        this(bm25, embedding, experience, location, true, true, true, true);
     }
 }

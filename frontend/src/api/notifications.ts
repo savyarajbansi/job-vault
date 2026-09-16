@@ -4,9 +4,7 @@ export type NotificationType =
   | "APPLICATION_SUBMITTED"
   | "APPLICATION_STATUS_CHANGED"
   | "JOB_POSTED_MATCHING_SECTOR"
-  | "JOB_MATCH_FOUND"
-  | "CANDIDATE_SHORTLISTED"
-  | "SHORTLIST_ACCEPTED";
+  | "JOB_MATCH_FOUND";
 
 export type NotificationItem = {
   id: string;
@@ -14,9 +12,6 @@ export type NotificationItem = {
   message: string;
   isRead: boolean;
   createdAt: string;
-  relatedJobId: string | null;
-  shortlistId: string | null;
-  shortlistStatus: "PENDING" | "ACCEPTED" | null;
 };
 
 export type NotificationUnreadCount = {

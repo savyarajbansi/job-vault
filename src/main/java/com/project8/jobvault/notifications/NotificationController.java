@@ -38,17 +38,7 @@ public class NotificationController {
                         notification.getType(),
                         notification.getMessage(),
                         notification.isRead(),
-                        notification.getCreatedAt(),
-                        notification.getCandidateMatchNotification() == null
-                                || notification.getCandidateMatchNotification().getJob() == null
-                                ? null
-                                : notification.getCandidateMatchNotification().getJob().getId(),
-                        notification.getCandidateMatchNotification() == null
-                                ? null
-                                : notification.getCandidateMatchNotification().getId(),
-                        notification.getCandidateMatchNotification() == null
-                                ? null
-                                : notification.getCandidateMatchNotification().getStatus()))
+                        notification.getCreatedAt()))
                 .toList();
     }
 

@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -67,6 +68,22 @@ public class SkillCatalog {
             return "";
         }
         return canonicalByTerm.getOrDefault(normalized, normalized);
+    }
+
+    /** Replaces only known catalog aliases, preserving ordinary natural text. */
+    public String canonicalizeText(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        Matcher matcher = extractionPattern.matcher(normalizeText(text));
+        StringBuffer result = new StringBuffer();
+        while (matcher.find()) {
+            String canonical = canonicalByTerm.get(matcher.group(1));
+            matcher.appendReplacement(result, Matcher.quoteReplacement(
+                    canonical == null ? matcher.group(1) : canonical));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 
     private static List<SkillDefinition> loadMatchers(String resourcePath) {

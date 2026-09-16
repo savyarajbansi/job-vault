@@ -30,6 +30,7 @@
         <java.version>25</java.version>
         <jjwt.version>0.12.5</jjwt.version>
         <pdfbox.version>3.0.3</pdfbox.version>
+        <djl.version>0.38.0</djl.version>
     </properties>
     <dependencies>
         <dependency>
@@ -77,6 +78,22 @@
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
             <version>${pdfbox.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+            <version>${djl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.djl.huggingface</groupId>
+            <artifactId>tokenizers</artifactId>
+            <version>${djl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.djl.onnxruntime</groupId>
+            <artifactId>onnxruntime-engine</artifactId>
+            <version>${djl.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
@@ -136,6 +153,15 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <debug>false</debug>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>

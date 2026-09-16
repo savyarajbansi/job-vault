@@ -48,7 +48,11 @@ jobvault:
     max-queue-depth: 20
     skill-dictionary: classpath:skills/skill-dictionary.txt
   matching:
-    idf-rebuild-interval-ms: 300000
+    corpus-rebuild-interval-ms: 300000
+    embedding:
+      enabled: true
+      model-directory: ${JOBVAULT_EMBEDDING_MODEL_DIR:models/all-MiniLM-L6-v2}
+      max-token-length: 256
   ratelimit:
     upload-per-minute: 5
     match-per-minute: 30

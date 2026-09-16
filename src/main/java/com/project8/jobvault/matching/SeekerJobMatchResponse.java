@@ -12,6 +12,7 @@ public record SeekerJobMatchResponse(
     public record SeekerJobMatchResponseItem(
             UUID jobId,
             double score,
+            boolean strongMatch,
             MatchFactorBreakdown factors,
             JobInfo job,
             List<String> missingSkills) {

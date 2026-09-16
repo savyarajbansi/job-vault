@@ -243,15 +243,20 @@ export default function JobEditor({ mode }: Props) {
         salaryMax: parsedSalaryMax,
         educationRequirement: (educationRequirement || null) as EducationRequirement | null,
       };
-      const result = isCreate
-        ? await createEmployerJob(payload)
-        : await updateEmployerJob(jobId!, payload);
-
-      applyJobToForm(result);
-
       if (isCreate) {
-        navigate(`/employer/jobs/${result.id}`, { replace: true });
+        await createEmployerJob(payload);
+      } else {
+        await updateEmployerJob(jobId!, payload);
       }
+
+      navigate("/employer", {
+        replace: true,
+        state: {
+          notice: isCreate
+            ? "Job created as a draft."
+            : "Job changes saved successfully.",
+        },
+      });
     } catch (err) {
       setError(formError(err));
     } finally {
@@ -324,10 +329,8 @@ export default function JobEditor({ mode }: Props) {
             </div>
           )}
 
-          <form onSubmit={(event) => void saveJob(event)} noValidate>
+          <form id="employer-job-editor-form" onSubmit={(event) => void saveJob(event)} noValidate>
             <div style={{ display: "grid", gap: "1rem" }}>
-              {error && <Alert tone="error">{error}</Alert>}
-
               {/* ── Core fields ── */}
               <Input
                 label="Job title"
@@ -566,24 +569,6 @@ export default function JobEditor({ mode }: Props) {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "0.75rem",
-                marginTop: "1.5rem",
-              }}
-            >
-              <Link
-                to="/employer"
-                style={{ alignSelf: "center", color: "var(--ink-muted)" }}
-              >
-                Cancel
-              </Link>
-              <Button type="submit" loading={saving} disabled={isDisabled}>
-                {isCreate ? "Create job" : "Save changes"}
-              </Button>
-            </div>
           </form>
 
           {/* ── Required skills (editable) ── */}
@@ -596,49 +581,72 @@ export default function JobEditor({ mode }: Props) {
             </>
           )}
 
-          {!isCreate && (
-            <>
-              <Divider label="Status actions" />
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.75rem",
-                  marginTop: "1rem",
-                }}
-              >
-                {statusError && <Alert tone="error">{statusError}</Alert>}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-                  {job?.status === "DRAFT" && (
-                    <Button
-                      loading={statusLoading}
-                      onClick={() => void runLifecycleAction("publish")}
-                    >
-                      Publish
-                    </Button>
-                  )}
-                  {job?.status === "ACTIVE" && (
-                    <Button
-                      loading={statusLoading}
-                      variant="secondary"
-                      onClick={() => void runLifecycleAction("disable")}
-                    >
-                      Disable
-                    </Button>
-                  )}
-                  {job?.status === "DISABLED" && (
-                    <Button
-                      loading={statusLoading}
-                      variant="secondary"
-                      onClick={() => void runLifecycleAction("reactivate")}
-                    >
-                      Reactivate
-                    </Button>
-                  )}
-                </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              marginTop: "1.5rem",
+              paddingTop: "1.25rem",
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            {error && <Alert tone="error">{error}</Alert>}
+            {statusError && <Alert tone="error">{statusError}</Alert>}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.75rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <Link to="/employer" style={{ color: "var(--ink-muted)" }}>
+                Cancel
+              </Link>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                {!isCreate && job?.status === "DRAFT" && (
+                  <Button
+                    type="button"
+                    loading={statusLoading}
+                    variant="secondary"
+                    onClick={() => void runLifecycleAction("publish")}
+                  >
+                    Publish
+                  </Button>
+                )}
+                {!isCreate && job?.status === "ACTIVE" && (
+                  <Button
+                    type="button"
+                    loading={statusLoading}
+                    variant="secondary"
+                    onClick={() => void runLifecycleAction("disable")}
+                  >
+                    Disable
+                  </Button>
+                )}
+                {!isCreate && job?.status === "DISABLED" && (
+                  <Button
+                    type="button"
+                    loading={statusLoading}
+                    variant="secondary"
+                    onClick={() => void runLifecycleAction("reactivate")}
+                  >
+                    Reactivate
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  form="employer-job-editor-form"
+                  loading={saving}
+                  disabled={isDisabled}
+                >
+                  {isCreate ? "Create job" : "Save changes"}
+                </Button>
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </Card>
       )}
     </main>

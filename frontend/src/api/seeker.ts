@@ -23,12 +23,12 @@ export type MatchPage = {
 };
 
 export type MatchFactors = {
-  cosine: number;
-  skillsOverlap: number;
+  bm25: number;
+  embedding: number;
   experience: number;
   location: number;
-  cosineAvailable: boolean;
-  skillsAvailable: boolean;
+  bm25Available: boolean;
+  embeddingAvailable: boolean;
   experienceAvailable: boolean;
   locationAvailable: boolean;
 };
@@ -50,6 +50,7 @@ export type JobInfo = {
 export type SeekerMatchItem = {
   jobId: string;
   score: number;
+  strongMatch: boolean;
   factors: MatchFactors;
   job: JobInfo;
   missingSkills: string[];
@@ -159,14 +160,6 @@ export async function getSeekerResume(
   const query = new URLSearchParams({ download: String(download) });
   if (jobId) query.set("jobId", jobId);
   return authorizedBlobRequest(`/api/profiles/seekers/${seekerId}/resume?${query.toString()}`);
-}
-
-export async function acceptSeekerShortlist(shortlistId: string): Promise<{
-  notified: boolean;
-  shortlistId: string;
-  status: "PENDING" | "ACCEPTED";
-}> {
-  return authorizedRequest(`/api/seeker/shortlists/${shortlistId}/accept`, { method: "POST" });
 }
 
 // Applications

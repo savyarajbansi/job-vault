@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isStrongMatch, STRONG_MATCH_THRESHOLD } from "./score";
+import { formatScore } from "./score";
 
-describe("match score labels", () => {
-  it("requires a score of at least 70 percent for a strong match", () => {
-    expect(STRONG_MATCH_THRESHOLD).toBe(0.7);
-    expect(isStrongMatch(0.7)).toBe(true);
-    expect(isStrongMatch(0.699)).toBe(false);
+describe("match score formatting", () => {
+  it("clamps scores to a display percentage", () => {
+    expect(formatScore(0.7)).toBe("70%");
+    expect(formatScore(-1)).toBe("0%");
+    expect(formatScore(2)).toBe("100%");
   });
 });

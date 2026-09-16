@@ -65,44 +65,6 @@ export type JobCreateRequest = {
 
 export type JobUpdateRequest = JobCreateRequest;
 
-export type MatchFactorBreakdown = {
-  cosine: number;
-  skillsOverlap: number;
-  experience: number;
-  location: number;
-  cosineAvailable: boolean;
-  skillsAvailable: boolean;
-  experienceAvailable: boolean;
-  locationAvailable: boolean;
-};
-
-export type CandidateMatchItem = {
-  resumeId: string;
-  seekerId: string;
-  seekerName: string | null;
-  score: number;
-  factors: MatchFactorBreakdown;
-  missingSkills: string[];
-  shortlistStatus: "PENDING" | "ACCEPTED" | null;
-};
-
-export type MatchPage = {
-  limit: number;
-  offset: number;
-  total: number;
-};
-
-export type CandidateMatchResponse = {
-  items: CandidateMatchItem[];
-  page: MatchPage;
-};
-
-export type CandidateMatchNotificationResponse = {
-  notified: boolean;
-  shortlistId: string | null;
-  status: "PENDING" | "ACCEPTED" | null;
-};
-
 export type ApplicationStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -146,16 +108,6 @@ export function formatSalaryRange(
 }
 
 // ── API functions ──────────────────────────────────────────────────────────
-function queryString(params: Record<string, string | number | undefined>): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
-    query.set(key, String(value));
-  }
-  const serialized = query.toString();
-  return serialized ? `?${serialized}` : "";
-}
-
 export async function getEmployerJobs(): Promise<JobSummary[]> {
   return authorizedRequest<JobSummary[]>("/api/employer/jobs", { method: "GET" });
 }
@@ -213,40 +165,6 @@ export async function removeEmployerJobSkill(jobId: string, skillName: string): 
   return authorizedRequest<JobDetail>(
     `/api/employer/jobs/${jobId}/skills/${encodeURIComponent(skillName)}`,
     { method: "DELETE" }
-  );
-}
-
-export async function getEmployerCandidateMatches(
-  jobId: string,
-  params: { limit: number; offset: number }
-): Promise<CandidateMatchResponse> {
-  return authorizedRequest<CandidateMatchResponse>(
-    `/api/employer/jobs/${jobId}/matches/candidates${queryString(params)}`,
-    { method: "GET" }
-  );
-}
-
-/**
- * Notifies a candidate of a strong match.
- *
- * `score` is passed in on the 0.0–1.0 scale used everywhere else in the
- * frontend (CandidateMatchItem.score, the displayed percentage, etc.). The
- * backend's CandidateMatchRequest / EmployerMatchController expects a 0–100
- * scale and compares it against a 70.0 threshold, so it's rescaled here at
- * the API boundary — every existing call site keeps passing its local
- * 0.0–1.0 score unchanged.
- */
-export async function notifyEmployerCandidate(
-  jobId: string,
-  seekerId: string
-): Promise<CandidateMatchNotificationResponse> {
-  return authorizedRequest<CandidateMatchNotificationResponse>(
-    `/api/employer/jobs/${jobId}/matches`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seekerId }),
-    }
   );
 }
 

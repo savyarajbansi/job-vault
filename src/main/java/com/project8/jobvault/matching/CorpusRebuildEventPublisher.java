@@ -7,10 +7,10 @@ import org.springframework.stereotype.Component;
  * Thin wrapper around ApplicationEventPublisher for posting
  * CorpusRebuildEvent instances.
  *
- * Inject this component instead of CorpusIdfService in controllers
- * and services that previously called corpusIdfService.rebuildFromRepository()
+ * Inject this component instead of MatchingCorpusService in controllers
+ * and services that need the matching corpus refreshed asynchronously
  * synchronously. The event is picked up by
- * CorpusIdfService#onCorpusRebuildEvent after the surrounding transaction
+ * MatchingCorpusService#onCorpusRebuildEvent after the surrounding transaction
  * commits, on a background thread.
  */
 @Component
@@ -23,7 +23,7 @@ public class CorpusRebuildEventPublisher {
     }
 
     /**
-     * Schedules an asynchronous IDF corpus rebuild to run after the current
+     * Schedules an asynchronous BM25/embedding corpus rebuild to run after the current
      * transaction commits.
      *
      * @param reason short label written to the debug log, e.g. "job-published"

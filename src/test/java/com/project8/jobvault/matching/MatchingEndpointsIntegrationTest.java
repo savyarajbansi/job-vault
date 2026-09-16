@@ -6,7 +6,6 @@ import com.project8.jobvault.auth.RefreshTokenRepository;
 import com.project8.jobvault.jobs.Job;
 import com.project8.jobvault.jobs.JobRepository;
 import com.project8.jobvault.jobs.JobStatus;
-import com.project8.jobvault.jobs.CandidateMatchNotificationRepository;
 import com.project8.jobvault.notifications.NotificationRepository;
 import com.project8.jobvault.resumes.ResumeMetadata;
 import com.project8.jobvault.resumes.ResumeMetadataRepository;
@@ -69,6 +68,9 @@ class MatchingEndpointsIntegrationTest {
     @Autowired
     private JwtTokenService jwtTokenService;
 
+    @Autowired
+    private MatchingCorpusService matchingCorpusService;
+
     @MockitoBean
     private JobRepository jobRepository;
 
@@ -91,15 +93,10 @@ class MatchingEndpointsIntegrationTest {
     private NotificationRepository notificationRepository;
 
     @MockitoBean
-    private CandidateMatchNotificationRepository candidateMatchNotificationRepository;
-
-    @MockitoBean
     private SkillRepository skillRepository;
 
     private UserAccount seekerUser;
     private UserAccount employerUser;
-    private UserAccount otherEmployerUser;
-
     private ResumeMetadata seekerResume;
     private Job strongMatchJob;
     private Job weakMatchJob;
@@ -110,7 +107,6 @@ class MatchingEndpointsIntegrationTest {
         Role employerRole = buildRole("EMPLOYER");
         seekerUser = buildUser("seeker@example.com", seekerRole);
         employerUser = buildUser("employer@example.com", employerRole);
-        otherEmployerUser = buildUser("other-employer@example.com", employerRole);
         seekerUser.setYearsExperience(5);
         seekerUser.setPreferredLocation("Austin, TX");
         seekerUser.setRemoteOk(true);
@@ -122,9 +118,6 @@ class MatchingEndpointsIntegrationTest {
             }
             if (id.equals(employerUser.getId())) {
                 return Optional.of(employerUser);
-            }
-            if (id.equals(otherEmployerUser.getId())) {
-                return Optional.of(otherEmployerUser);
             }
             return Optional.empty();
         });
@@ -141,7 +134,7 @@ class MatchingEndpointsIntegrationTest {
                 employerUser,
                 JobStatus.ACTIVE,
                 "Backend Engineer",
-                "Java Spring SQL microservices",
+                "Java Spring Boot SQL REST APIs",
                 Set.of(skill("java"), skill("spring"), skill("kubernetes")));
         strongMatchJob.setCompanyName("Acme Corp");
         strongMatchJob.setLocation("Austin, TX");
@@ -200,6 +193,8 @@ class MatchingEndpointsIntegrationTest {
                 .thenReturn(List.of(
                         new TestTrendingSkillRow(UUID.randomUUID(), "java", new BigDecimal("10.5")),
                         new TestTrendingSkillRow(UUID.randomUUID(), "spring", new BigDecimal("7.0"))));
+
+        matchingCorpusService.rebuildFromRepository();
     }
 
     @Test
@@ -208,7 +203,14 @@ class MatchingEndpointsIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].jobId").value(strongMatchJob.getId().toString()))
+                .andExpect(jsonPath("$.items[0].strongMatch").value(false))
                 .andExpect(jsonPath("$.items[0].missingSkills[0]").value("kubernetes"))
+                .andExpect(jsonPath("$.items[0].factors.bm25").isNumber())
+                .andExpect(jsonPath("$.items[0].factors.embedding").value(0.0))
+                .andExpect(jsonPath("$.items[0].factors.bm25Available").value(true))
+                .andExpect(jsonPath("$.items[0].factors.embeddingAvailable").value(false))
+                .andExpect(jsonPath("$.items[0].factors.cosine").doesNotExist())
+                .andExpect(jsonPath("$.items[0].factors.skillsOverlap").doesNotExist())
                 .andExpect(jsonPath("$.items[0].factors.experience").value(1.0))
                 .andExpect(jsonPath("$.items[0].factors.location").value(1.0))
                 .andExpect(jsonPath("$.items[0].job.companyName").value("Acme Corp"))
@@ -224,44 +226,6 @@ class MatchingEndpointsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobId").value(strongMatchJob.getId().toString()))
                 .andExpect(jsonPath("$.missingSkills[0]").value("kubernetes"));
-    }
-
-    @Test
-    void employerCandidatesReturnsRankedResumes() throws Exception {
-        mockMvc.perform(get("/api/employer/jobs/{jobId}/matches/candidates", strongMatchJob.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].resumeId").value(seekerResume.getId().toString()))
-                .andExpect(jsonPath("$.items[0].seekerId").value(seekerUser.getId().toString()));
-    }
-
-    @Test
-    void employerCandidatesExcludeIneligibleSeekerBeforePagination() throws Exception {
-        seekerUser.setPreferredSectors("IT");
-        seekerUser.setWorkMode(WorkMode.REMOTE);
-        strongMatchJob.setSectorTags("HEALTHCARE");
-        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
-
-        mockMvc.perform(get("/api/employer/jobs/{jobId}/matches/candidates", strongMatchJob.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isEmpty())
-                .andExpect(jsonPath("$.page.total").value(0));
-    }
-
-    @Test
-    void shortlistCreationRejectsIneligibleSeeker() throws Exception {
-        seekerUser.setPreferredSectors("IT");
-        seekerUser.setWorkMode(WorkMode.REMOTE);
-        strongMatchJob.setSectorTags("HEALTHCARE");
-        strongMatchJob.setWorkMode(WorkMode.ON_SITE);
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                        "/api/employer/jobs/{jobId}/matches", strongMatchJob.getId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(employerUser))
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"seekerId\":\"" + seekerUser.getId() + "\"}"))
-                .andExpect(status().isNotFound());
     }
 
     @Test

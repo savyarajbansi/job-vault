@@ -49,12 +49,14 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function ProfileForm({
   profile,
+  formId,
   onSaved,
-  onCancel,
+  onSavingChange,
 }: {
   profile: SeekerProfile;
+  formId: string;
   onSaved: (profile: SeekerProfile) => void;
-  onCancel: () => void;
+  onSavingChange: (saving: boolean) => void;
 }) {
   const [displayName, setDisplayName] = useState(profile.displayName ?? "");
   const [sectors, setSectors] = useState<SectorCode[]>(profile.preferredSectors);
@@ -63,7 +65,6 @@ function ProfileForm({
   const [years, setYears] = useState(profile.yearsExperience == null ? "" : String(profile.yearsExperience));
   const [skills, setSkills] = useState(profile.resume?.skills ?? []);
   const [newSkill, setNewSkill] = useState("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const addSkill = () => {
@@ -83,7 +84,7 @@ function ProfileForm({
       setError("Years of experience must be between 0 and 60.");
       return;
     }
-    setSaving(true);
+    onSavingChange(true);
     try {
       const updated = await updateSeekerProfile({
         displayName: displayName.trim() || null,
@@ -97,12 +98,12 @@ function ProfileForm({
     } catch (err) {
       setError(errorMessage(err, "Could not save your profile."));
     } finally {
-      setSaving(false);
+      onSavingChange(false);
     }
   };
 
   return (
-    <form onSubmit={(event) => void submit(event)} noValidate>
+    <form id={formId} onSubmit={(event) => void submit(event)} noValidate>
       <div style={{ display: "grid", gap: "1rem" }}>
         {error && <Alert tone="error">{error}</Alert>}
         <Input
@@ -170,10 +171,6 @@ function ProfileForm({
             </>
           ) : <p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>Upload a parsed resume before editing skills.</p>}
         </fieldset>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", marginTop: "0.5rem" }}>
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-          <Button type="submit" loading={saving}>Save profile</Button>
-        </div>
       </div>
     </form>
   );
@@ -232,6 +229,7 @@ export default function SeekerProfile() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
 
@@ -334,8 +332,33 @@ export default function SeekerProfile() {
         </article>
       ) : null}
 
-      <Modal open={editOpen} title="Edit profile" description="Update the details recruiters use to understand your fit." onClose={() => setEditOpen(false)}>
-        {profile && <ProfileForm profile={profile} onCancel={() => setEditOpen(false)} onSaved={(updated) => { setProfile(updated); setEditOpen(false); setNotice("Profile saved. Matching preferences updated."); }} />}
+      <Modal
+        open={editOpen}
+        title="Edit profile"
+        description="Update the details recruiters use to understand your fit."
+        onClose={() => setEditOpen(false)}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="seeker-profile-edit-form" loading={profileSaving}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        {profile && <ProfileForm
+          profile={profile}
+          formId="seeker-profile-edit-form"
+          onSavingChange={setProfileSaving}
+          onSaved={(updated) => {
+            setProfile(updated);
+            setEditOpen(false);
+            setNotice("Profile saved. Matching preferences updated.");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />}
       </Modal>
       <Modal open={uploadOpen} title="Replace resume" description="Upload one PDF. It will replace the current resume and refresh parsed skills." onClose={() => setUploadOpen(false)} footer={<Button variant="ghost" onClick={() => setUploadOpen(false)}>Close</Button>}>
         <ResumeUploadZone onSuccess={() => { setUploadOpen(false); setNotice("Resume replaced and parsed. Matching will use the new version."); void loadProfile(); }} />
