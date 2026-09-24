@@ -10,7 +10,7 @@ import {
   updateEmployerJob,
 } from "../api/employer";
 import type { EducationRequirement, JobDetail, JobStatus } from "../api/employer";
-import { SECTOR_OPTIONS, WORK_MODE_LABELS } from "../api/matching";
+import { NEPAL_CITY_OPTIONS, SECTOR_OPTIONS, WORK_MODE_LABELS } from "../api/matching";
 import type { SectorCode, WorkMode } from "../api/matching";
 import { ApiResponseError } from "../api/client";
 import { Alert, Badge, Button, Card, Divider, Input, Spinner } from "../components/ui";
@@ -184,6 +184,9 @@ export default function JobEditor({ mode }: Props) {
       minExperienceYears.trim() === "" ? null : Number(minExperienceYears);
     const parsedSalaryMin = salaryMin.trim() === "" ? null : Number(salaryMin);
     const parsedSalaryMax = salaryMax.trim() === "" ? null : Number(salaryMax);
+    const selectedLocation = NEPAL_CITY_OPTIONS.find(
+      (option) => option.value === trimmedLocation
+    )?.value ?? null;
 
     if (!trimmedTitle) {
       setError("Job title is required.");
@@ -203,6 +206,10 @@ export default function JobEditor({ mode }: Props) {
     }
     if (trimmedLocation.length > 150) {
       setError("Location must be 150 characters or fewer.");
+      return;
+    }
+    if (trimmedLocation && !NEPAL_CITY_OPTIONS.some((option) => option.value === trimmedLocation)) {
+      setError("Select a supported Nepal city from the location list.");
       return;
     }
     if (
@@ -235,7 +242,7 @@ export default function JobEditor({ mode }: Props) {
         title: trimmedTitle,
         description: trimmedDescription,
         companyName: trimmedCompanyName || null,
-        location: trimmedLocation || null,
+        location: selectedLocation,
         sectorTags,
         workMode: workMode || null,
         minExperienceYears: parsedExperience,
@@ -387,14 +394,23 @@ export default function JobEditor({ mode }: Props) {
               </div>
 
               {/* ── Location & remote ── */}
-              <Input
-                label="Location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                maxLength={150}
-                disabled={isDisabled}
-                placeholder="Chicago, IL"
-              />
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.375rem", fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)" }}>
+                Location
+                <select
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  disabled={isDisabled}
+                  style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}
+                >
+                  <option value="">Not specified</option>
+                  {location && !NEPAL_CITY_OPTIONS.some((option) => option.value === location) && (
+                    <option value={location} disabled>{location} (legacy value)</option>
+                  )}
+                  {NEPAL_CITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
 
               <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
                 <legend style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--ink-2)", marginBottom: "0.55rem" }}>
@@ -574,7 +590,7 @@ export default function JobEditor({ mode }: Props) {
           {/* ── Required skills (editable) ── */}
           {!isCreate && job && (
             <>
-              <Divider label="Required skills" />
+              <Divider label="Skills used for matching" />
               <div style={{ marginTop: "1rem" }}>
                 <JobSkillsEditor job={job} onUpdate={applyJobToForm} />
               </div>

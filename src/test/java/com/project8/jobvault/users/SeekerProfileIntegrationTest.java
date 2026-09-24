@@ -88,6 +88,8 @@ class SeekerProfileIntegrationTest {
         seekerUser.setPreferredLocation("Kathmandu");
         seekerUser.setWorkMode(com.project8.jobvault.matching.WorkMode.REMOTE);
         seekerUser.setYearsExperience(4);
+        seekerUser.setPreferredSalaryMin(80000);
+        seekerUser.setPreferredSalaryMax(120000);
 
         when(userAccountRepository.findById(nonNullArgument())).thenAnswer(invocation -> {
             UUID userId = invocation.getArgument(0);
@@ -109,7 +111,9 @@ class SeekerProfileIntegrationTest {
                 .andExpect(jsonPath("$.preferredSectors[1]").value("IT"))
                 .andExpect(jsonPath("$.preferredLocation").value("Kathmandu"))
                 .andExpect(jsonPath("$.workMode").value("REMOTE"))
-                .andExpect(jsonPath("$.yearsExperience").value(4));
+                .andExpect(jsonPath("$.yearsExperience").value(4))
+                .andExpect(jsonPath("$.preferredSalaryMin").value(80000))
+                .andExpect(jsonPath("$.preferredSalaryMax").value(120000));
     }
 
     @Test
@@ -122,14 +126,18 @@ class SeekerProfileIntegrationTest {
                           "preferredSectors":["IT"],
                           "preferredLocation":"  Lalitpur  ",
                           "workMode":"HYBRID",
-                          "yearsExperience":7
+                          "yearsExperience":7,
+                          "preferredSalaryMin":90000,
+                          "preferredSalaryMax":130000
                         }
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.preferredSectors[0]").value("IT"))
                 .andExpect(jsonPath("$.preferredLocation").value("Lalitpur"))
                 .andExpect(jsonPath("$.workMode").value("HYBRID"))
-                .andExpect(jsonPath("$.yearsExperience").value(7));
+                .andExpect(jsonPath("$.yearsExperience").value(7))
+                .andExpect(jsonPath("$.preferredSalaryMin").value(90000))
+                .andExpect(jsonPath("$.preferredSalaryMax").value(130000));
     }
 
     @Test
@@ -147,6 +155,35 @@ class SeekerProfileIntegrationTest {
                 .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
                 .andExpect(jsonPath("$.details.reason").value("validation_failed"))
                 .andExpect(jsonPath("$.details.fields.yearsExperience").exists());
+    }
+
+    @Test
+    void patchProfileRejectsCustomLocation() throws Exception {
+        mockMvc.perform(patch("/api/seeker/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser))
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "preferredLocation":"Austin, TX"
+                        }
+                        """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patchProfileRejectsInvertedSalaryRange() throws Exception {
+        mockMvc.perform(patch("/api/seeker/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser))
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .content("""
+                        {
+                          "preferredSalaryMin":120000,
+                          "preferredSalaryMax":80000
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR_VALIDATION_001"))
+                .andExpect(jsonPath("$.details.fields.preferredSalaryMax").exists());
     }
 
     private String issueToken(UserAccount user) {

@@ -14,6 +14,8 @@ public record SeekerProfileResponse(
         String preferredLocation,
         WorkMode workMode,
         Integer yearsExperience,
+        Integer preferredSalaryMin,
+        Integer preferredSalaryMax,
         CurrentResume resume) {
 
     public record CurrentResume(

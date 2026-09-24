@@ -68,33 +68,39 @@ public final class Bm25Scorer {
             return new Result(0.0, false);
         }
 
-        Map<String, Integer> termFrequency = frequencies(documentTokens);
-        Set<String> knownQueryTerms = new HashSet<>();
+        Set<String> queryTerms = new HashSet<>();
         for (String token : queryTokens) {
-            if (token != null && idfByTerm.containsKey(token)) {
-                knownQueryTerms.add(token);
+            if (token != null && !token.isBlank()) {
+                queryTerms.add(token);
             }
         }
-        if (knownQueryTerms.isEmpty()) {
+        if (queryTerms.isEmpty()) {
+            return new Result(0.0, false);
+        }
+        boolean hasKnownQueryTerm = queryTerms.stream().anyMatch(idfByTerm::containsKey);
+        if (!hasKnownQueryTerm) {
             return new Result(0.0, false);
         }
 
+        Map<String, Integer> termFrequency = frequencies(documentTokens);
         double documentLength = documentTokens.size();
         double lengthNormalization = averageDocumentLength <= 0.0
                 ? 1.0
                 : 1.0 - DEFAULT_B + DEFAULT_B * documentLength / averageDocumentLength;
         double rawScore = 0.0;
         double theoreticalMaximum = 0.0;
-        for (String term : knownQueryTerms) {
+        boolean hasOverlap = false;
+        for (String term : termFrequency.keySet()) {
             double idf = idfByTerm.getOrDefault(term, 0.0);
             if (idf <= 0.0) {
                 continue;
             }
-            theoreticalMaximum += idf * (DEFAULT_K1 + 1.0);
-            int frequency = termFrequency.getOrDefault(term, 0);
-            if (frequency == 0) {
-                continue;
-            }
+            int frequency = termFrequency.get(term);
+            double maximumNumerator = DEFAULT_K1 + 1.0;
+            double maximumDenominator = 1.0 + DEFAULT_K1 * lengthNormalization;
+            theoreticalMaximum += idf * maximumNumerator / maximumDenominator;
+            if (!queryTerms.contains(term)) continue;
+            hasOverlap = true;
             double numerator = frequency * (DEFAULT_K1 + 1.0);
             double denominator = frequency + DEFAULT_K1 * lengthNormalization;
             rawScore += idf * numerator / denominator;
@@ -102,6 +108,9 @@ public final class Bm25Scorer {
 
         if (theoreticalMaximum <= 0.0) {
             return new Result(0.0, false);
+        }
+        if (!hasOverlap) {
+            return new Result(0.0, true);
         }
         return new Result(clamp01(rawScore / theoreticalMaximum), true);
     }

@@ -10,6 +10,9 @@ application-local.yaml
 # Local resume storage
 storage/
 
+# Local embedding model assets
+/models/
+
 # Agent artifacts
 agent_logs/
 agent-plan*
@@ -26,6 +29,7 @@ keys/
 # Documentation artifacts (local-only)
 /docs/plan/
 /docs/PRD.yaml
+.PRODUCT.md
 
 ### STS ###
 .apt_generated

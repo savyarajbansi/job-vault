@@ -147,7 +147,7 @@ export default function SeekerMatches() {
         <div className="page-header__copy">
           <h1>Job Matches</h1>
           <p className="page-header__subtitle">
-            Ranked by BM25 keyword relevance, semantic similarity, experience, and location when those signals are available.
+            Ranked by lexical relevance, semantic similarity, experience, location, and salary when those signals are available.
           </p>
         </div>
       </div>
@@ -321,6 +321,41 @@ export default function SeekerMatches() {
                   </div>
                 </div>
 
+                {/* Skills detected from the posting and used by matching */}
+                {selected.job.requiredSkills.length > 0 && (
+                  <div>
+                    <h4 style={{ marginBottom: "0.35rem" }}>Skills used for matching</h4>
+                    <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginBottom: "0.7rem" }}>
+                      Detected from the posting and supplemented by employer-added requirements.
+                      Green skills match your profile; orange skills are gaps.
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                      {selected.job.requiredSkills.map((skill) => {
+                        const isMissing = selected.missingSkills.includes(skill);
+                        return (
+                          <span
+                            key={skill}
+                            aria-label={`${skill}: ${isMissing ? "skill gap" : "matched"}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "0.35rem 0.65rem",
+                              border: `1px solid ${isMissing ? "var(--warn-faint)" : "var(--success-faint)"}`,
+                              background: isMissing ? "var(--warn-faint)" : "var(--success-faint)",
+                              color: isMissing ? "var(--warn)" : "var(--success)",
+                              borderRadius: "var(--radius-sm)",
+                              fontSize: "0.8125rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {skill}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Application actions ── */}
                 <div
                   style={{
@@ -421,36 +456,8 @@ export default function SeekerMatches() {
                   <MatchFactorBar value={selected.factors.embedding} available={selected.factors.embeddingAvailable} label="Semantic similarity" />
                   <MatchFactorBar value={selected.factors.experience} available={selected.factors.experienceAvailable} label="Experience" />
                   <MatchFactorBar value={selected.factors.location} available={selected.factors.locationAvailable} label="Location" />
+                  <MatchFactorBar value={selected.factors.salary} available={selected.factors.salaryAvailable} label="Salary compatibility" />
                 </div>
-
-                {/* Required skills */}
-                {selected.job.requiredSkills.length > 0 && (
-                  <div>
-                    <h4 style={{ fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-muted)", marginBottom: "0.625rem" }}>
-                      Required skills
-                    </h4>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
-                      {selected.job.requiredSkills.map((skill) => {
-                        const isMissing = selected.missingSkills.includes(skill);
-                        return (
-                          <span
-                            key={skill}
-                            style={{
-                              padding: "0.25rem 0.625rem",
-                              background: isMissing ? "var(--warn-faint)" : "var(--success-faint)",
-                              color: isMissing ? "var(--warn)" : "var(--success)",
-                              borderRadius: "999px",
-                              fontSize: "0.8125rem",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {skill}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 {/* Skill gaps */}
                 <div>

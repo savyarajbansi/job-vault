@@ -51,6 +51,12 @@ public class UserAccount {
     @Column(name = "years_experience")
     private Integer yearsExperience;
 
+    @Column(name = "preferred_salary_min")
+    private Integer preferredSalaryMin;
+
+    @Column(name = "preferred_salary_max")
+    private Integer preferredSalaryMax;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -156,6 +162,22 @@ public class UserAccount {
 
     public void setYearsExperience(Integer yearsExperience) {
         this.yearsExperience = yearsExperience;
+    }
+
+    public Integer getPreferredSalaryMin() {
+        return preferredSalaryMin;
+    }
+
+    public void setPreferredSalaryMin(Integer preferredSalaryMin) {
+        this.preferredSalaryMin = preferredSalaryMin;
+    }
+
+    public Integer getPreferredSalaryMax() {
+        return preferredSalaryMax;
+    }
+
+    public void setPreferredSalaryMax(Integer preferredSalaryMax) {
+        this.preferredSalaryMax = preferredSalaryMax;
     }
 
     public boolean isEnabled() {

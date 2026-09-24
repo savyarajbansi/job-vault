@@ -34,21 +34,25 @@ Matching is deterministic and computed on demand. It is guidance for prioritisin
 1. Eligibility is applied first. Only active jobs, parsed resumes, and enabled accounts participate. A seeker must match the job's preferred sector and work-mode constraints when those preferences are set.
 2. Eligible results are ranked using a hybrid lexical-semantic score:
    - BM25 keyword relevance: 0.45
-   - sentence-embedding similarity: 0.30
+   - sentence-embedding similarity: 0.20
    - experience: 0.15
    - location/work-mode fit: 0.10
-3. BM25 uses the active-job corpus, Okapi parameters `k1 = 1.2` and `b = 0.75`, canonical skill aliases from the local skill dictionary, and unigram/bigram tokens. Its raw result is divided by the theoretical maximum for the resume's known query terms and clamped to `[0, 1]`.
-4. A factor with no usable input is omitted and the remaining weights are renormalized. The response identifies which factors were available so the score can be interpreted correctly.
-5. Embeddings use a local, pinned `all-MiniLM-L6-v2` ONNX model through DJL and ONNX Runtime. Job vectors are cached in the in-memory active-job corpus; one resume vector is generated per matching request. If the model is disabled or unavailable, BM25 and the structured factors remain usable.
-6. Experience is the candidate's years divided by the job's minimum years, capped at `1.0`. A missing or non-positive requirement, or missing candidate experience, makes the factor unavailable.
-7. `strongMatch` requires an overall score of at least `0.70` and at least one available scoring factor. Required skills are not a second weighted score.
-8. Skill gaps are the required skills not found in the parsed resume after skill-name canonicalisation. Automatic job skill extraction remains available for required-skill display and gap explanations.
+   - salary compatibility: 0.10
+3. BM25 is a field-aware lexical factor. It combines canonical required-skill coverage (`0.60`), target-aware title BM25 (`0.25`), and target-aware description BM25 (`0.15`). The title and description calculations use the active-job corpus, Okapi parameters `k1 = 1.2` and `b = 0.75`, canonical skill aliases, and unigram tokens. Each usable lexical component is bounded to `0..1`; unavailable components are omitted and the remaining lexical weights are renormalized. Bigram expansion is not included in document-length statistics.
+4. Salary compatibility is available when both the seeker and job provide at least one salary bound. It returns `0.0` only when the seeker's preferred minimum is higher than the job's maximum; lower seeker expectations do not reduce the score. Missing minimum or maximum endpoints are treated as open-ended.
+5. A factor with no usable input is omitted and the remaining weights are renormalized. The response identifies which factors were available so the score can be interpreted correctly.
+6. Embeddings use a local, pinned `all-MiniLM-L6-v2` ONNX model through DJL and ONNX Runtime. Job vectors are cached in the in-memory active-job corpus; one resume vector is generated per matching request. If the model is disabled or unavailable, BM25 and the structured factors remain usable.
+7. Experience is the candidate's years divided by the job's minimum years, capped at `1.0`. A missing or non-positive requirement, or missing candidate experience, makes the factor unavailable.
+8. `strongMatch` requires an overall score of at least `0.70` and at least one available scoring factor. Required skills contribute inside BM25 and are not a second top-level weighted factor.
+9. Skill gaps are the required skills not found in the parsed resume after skill-name canonicalisation. Automatic job skill extraction remains available for required-skill display and gap explanations.
+
+The `factors.lexical` response object exposes the required-skills, title, and description sub-scores and their availability flags. The top-level `factors.bm25` value is the weighted lexical result used in the overall score.
 
 Scores and skill gaps make the recommendation explainable, but employers remain responsible for reviewing the candidate and making the hiring decision.
 
 ## Embedding model setup
 
-Embeddings run inside Spring Boot; no Python service is required. Keep the model assets outside Git and set `JOBVAULT_EMBEDDING_MODEL_DIR` to the local DJL-compatible `all-MiniLM-L6-v2` ONNX model directory. The directory must include the ONNX model, tokenizer assets, and the DJL serving configuration for ONNX Runtime and mean pooling. The application defaults to `models/all-MiniLM-L6-v2` and safely falls back to BM25 when those assets are not present.
+Embeddings run inside Spring Boot; no Python service is required. Keep the model assets outside Git and set `JOBVAULT_EMBEDDING_MODEL_DIR` to the local DJL-compatible `all-MiniLM-L6-v2` ONNX model directory. The directory should contain `model.onnx`, `config.json`, and the Hugging Face tokenizer assets (`tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`, and `vocab.txt`). BERT exports that retain `token_type_ids` are supported by the DJL translator configuration. The application defaults to `models/all-MiniLM-L6-v2` and safely falls back to BM25 when those assets are not present or cannot be loaded. The `embeddingAvailable` factor flag and the `Semantic matching disabled` warning identify this fallback. The current Java translator uses mean pooling and normalizes the output; an optional `serving.properties` may explicitly set `pooling=mean`.
 
 DJL provides the [ONNX Runtime engine](https://docs.djl.ai/master/engines/onnxruntime/onnxruntime-engine/index.html) and [Hugging Face tokenizer support](https://github.com/deepjavalibrary/djl/tree/master/extensions/tokenizers). The application uses the local model rather than downloading it during a request.
 

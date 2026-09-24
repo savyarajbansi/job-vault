@@ -2,6 +2,7 @@ package com.project8.jobvault.jobs;
 
 import com.project8.jobvault.auth.JwtPrincipal;
 import com.project8.jobvault.matching.MatchingPreferences;
+import com.project8.jobvault.matching.NepalCity;
 import com.project8.jobvault.matching.SectorCode;
 import com.project8.jobvault.matching.CorpusRebuildEventPublisher;
 import com.project8.jobvault.parsing.SkillCatalog;
@@ -81,7 +82,7 @@ public class EmployerJobController {
         job.setDescription(request.description());
         job.setCompanyName(normalizeText(request.companyName()));
         job.setSectorTags(normalizeSectorTags(request.sectorTags()));
-        job.setLocation(normalizeText(request.location()));
+        job.setLocation(normalizeLocation(request.location()));
         job.setWorkMode(request.workMode());
         job.setMinExperienceYears(request.minExperienceYears());
         job.setSalaryMin(request.salaryMin());
@@ -126,7 +127,7 @@ public class EmployerJobController {
         job.setDescription(request.description());
         job.setCompanyName(normalizeText(request.companyName()));
         job.setSectorTags(normalizeSectorTags(request.sectorTags()));
-        job.setLocation(normalizeText(request.location()));
+        job.setLocation(normalizeLocation(request.location()));
         job.setWorkMode(request.workMode());
         job.setMinExperienceYears(request.minExperienceYears());
         job.setSalaryMin(request.salaryMin());
@@ -336,6 +337,14 @@ public class EmployerJobController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeLocation(String value) {
+        try {
+            return NepalCity.normalize(value);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
     }
 
     private String normalizeSectorTags(List<String> values) {

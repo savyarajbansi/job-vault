@@ -38,6 +38,8 @@ class MatchingCorpusServiceTest {
         MatchingCorpusService.CorpusSnapshot snapshot = service.getSnapshot();
         assertEquals(2, snapshot.jobs().size());
         assertTrue(snapshot.idfByTerm().containsKey("java"));
+        assertEquals(List.of("java"), snapshot.jobs().get(first.getId()).titleTokens());
+        assertEquals(List.of("spring", "microservices"), snapshot.jobs().get(first.getId()).descriptionTokens());
         assertNotNull(snapshot.jobs().get(first.getId()).embedding());
         assertEquals("test-model", snapshot.embeddingFingerprint());
     }

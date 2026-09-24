@@ -85,10 +85,13 @@ public class MatchingCorpusService {
             if (job == null) {
                 continue;
             }
-            String text = jobText(job);
+            String title = job.getTitle() == null ? "" : job.getTitle();
+            String description = job.getDescription() == null ? "" : job.getDescription();
+            String text = title + " " + description;
             documents.add(new JobDocument(
                     job.getId(),
-                    textPreprocessor.tokenize(text),
+                    textPreprocessor.tokenize(title),
+                    textPreprocessor.tokenize(description),
                     embeddingService.embed(text).orElse(null)));
         }
         documents.sort(Comparator.comparing(document -> document.id() == null ? "" : document.id().toString()));
@@ -100,7 +103,9 @@ public class MatchingCorpusService {
             snapshot = CorpusSnapshot.empty();
             return;
         }
-        List<List<String>> corpus = documents.stream().map(JobDocument::tokens).toList();
+        List<List<String>> corpus = documents.stream()
+                .map(document -> combine(document.titleTokens(), document.descriptionTokens()))
+                .toList();
         Map<UUID, JobDocument> byId = new LinkedHashMap<>();
         for (JobDocument document : documents) {
             if (document.id() != null) {
@@ -109,7 +114,12 @@ public class MatchingCorpusService {
         }
         snapshot = new CorpusSnapshot(
                 Bm25Scorer.computeIdf(corpus),
-                Bm25Scorer.averageDocumentLength(corpus),
+                Bm25Scorer.averageDocumentLength(documents.stream()
+                        .map(JobDocument::titleTokens)
+                        .toList()),
+                Bm25Scorer.averageDocumentLength(documents.stream()
+                        .map(JobDocument::descriptionTokens)
+                        .toList()),
                 byId,
                 fingerprint,
                 embeddingService.fingerprint());
@@ -134,11 +144,6 @@ public class MatchingCorpusService {
         }
     }
 
-    private String jobText(Job job) {
-        return (job.getTitle() == null ? "" : job.getTitle())
-                + " " + (job.getDescription() == null ? "" : job.getDescription());
-    }
-
     private String fingerprintDocuments(List<JobDocument> documents) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -146,7 +151,9 @@ public class MatchingCorpusService {
                 digest.update((document.id() == null ? "" : document.id().toString())
                         .getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
-                digest.update(document.tokens().toString().getBytes(StandardCharsets.UTF_8));
+                digest.update(document.titleTokens().toString().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(document.descriptionTokens().toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
             }
             StringBuilder result = new StringBuilder(64);
@@ -159,10 +166,32 @@ public class MatchingCorpusService {
         }
     }
 
-    public record JobDocument(UUID id, List<String> tokens, double[] embedding) {
+    private List<String> combine(List<String> titleTokens, List<String> descriptionTokens) {
+        List<String> combined = new ArrayList<>();
+        if (titleTokens != null) {
+            combined.addAll(titleTokens);
+        }
+        if (descriptionTokens != null) {
+            combined.addAll(descriptionTokens);
+        }
+        return List.copyOf(combined);
+    }
+
+    public record JobDocument(UUID id, List<String> titleTokens, List<String> descriptionTokens, double[] embedding) {
         public JobDocument {
-            tokens = tokens == null ? List.of() : List.copyOf(tokens);
+            titleTokens = titleTokens == null ? List.of() : List.copyOf(titleTokens);
+            descriptionTokens = descriptionTokens == null ? List.of() : List.copyOf(descriptionTokens);
             embedding = embedding == null ? null : embedding.clone();
+        }
+
+        public JobDocument(UUID id, List<String> tokens, double[] embedding) {
+            this(id, tokens, List.of(), embedding);
+        }
+
+        public List<String> tokens() {
+            List<String> combined = new ArrayList<>(titleTokens);
+            combined.addAll(descriptionTokens);
+            return List.copyOf(combined);
         }
 
         @Override
@@ -173,7 +202,8 @@ public class MatchingCorpusService {
 
     public record CorpusSnapshot(
             Map<String, Double> idfByTerm,
-            double averageDocumentLength,
+            double averageTitleLength,
+            double averageDescriptionLength,
             Map<UUID, JobDocument> jobs,
             String fingerprint,
             String embeddingFingerprint) {
@@ -184,8 +214,21 @@ public class MatchingCorpusService {
             embeddingFingerprint = embeddingFingerprint == null ? "unknown" : embeddingFingerprint;
         }
 
+        public CorpusSnapshot(
+                Map<String, Double> idfByTerm,
+                double averageDocumentLength,
+                Map<UUID, JobDocument> jobs,
+                String fingerprint,
+                String embeddingFingerprint) {
+            this(idfByTerm, averageDocumentLength, averageDocumentLength, jobs, fingerprint, embeddingFingerprint);
+        }
+
+        public double averageDocumentLength() {
+            return averageTitleLength + averageDescriptionLength;
+        }
+
         public static CorpusSnapshot empty() {
-            return new CorpusSnapshot(Map.of(), 0.0, Map.of(), "empty", "unavailable");
+            return new CorpusSnapshot(Map.of(), 0.0, 0.0, Map.of(), "empty", "unavailable");
         }
     }
 }

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiResponseError } from "../api/client";
 import { getSeekerPublicProfile, getSeekerResume } from "../api/seeker";
 import type { SeekerProfile } from "../api/seeker";
+import { formatSalaryRange } from "../api/employer";
 import { SECTOR_OPTIONS, WORK_MODE_LABELS } from "../api/matching";
 import { Alert, Badge, Button, EmptyState } from "../components/ui";
 import PageLoader from "../components/PageLoader";
@@ -67,6 +68,7 @@ export default function SeekerProfileView() {
               <div><dt>Location</dt><dd>{profile.preferredLocation || "Not set"}</dd></div>
               <div><dt>Work preference</dt><dd>{profile.workMode ? WORK_MODE_LABELS[profile.workMode] : "Not specified"}</dd></div>
               <div><dt>Experience</dt><dd>{profile.yearsExperience == null ? "Not set" : `${profile.yearsExperience} years`}</dd></div>
+              <div><dt>Preferred salary</dt><dd>{formatSalaryRange(profile.preferredSalaryMin, profile.preferredSalaryMax) ?? "Not set"}</dd></div>
             </dl></section>
             <section><h3>Resume</h3>{profile.resume ? <><p style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{profile.resume.originalFilename}</p><p style={{ color: "var(--ink-muted)", fontSize: "0.875rem" }}>{profile.resume.skills.length} skills parsed</p><div style={{ display: "flex", gap: "0.5rem", marginTop: "0.875rem", flexWrap: "wrap" }}><Button size="sm" variant="secondary" onClick={() => void openResume(false)} disabled={profile.resume.status !== "PARSED"}>View resume</Button><Button size="sm" variant="ghost" onClick={() => void openResume(true)} disabled={profile.resume.status !== "PARSED"}>Download</Button></div></> : <EmptyState title="No resume available" description="This seeker has not uploaded a parsed resume." />}</section>
           </div>

@@ -18,9 +18,13 @@ import org.springframework.stereotype.Service;
 public class MatchScorer {
     public static final double STRONG_MATCH_THRESHOLD = 0.70;
     public static final double BM25_WEIGHT = 0.45;
-    public static final double EMBEDDING_WEIGHT = 0.30;
+    public static final double EMBEDDING_WEIGHT = 0.20;
     public static final double EXPERIENCE_WEIGHT = 0.15;
     public static final double LOCATION_WEIGHT = 0.10;
+    public static final double SALARY_WEIGHT = 0.10;
+    private static final double REQUIRED_SKILLS_LEXICAL_WEIGHT = 0.60;
+    private static final double TITLE_LEXICAL_WEIGHT = 0.25;
+    private static final double DESCRIPTION_LEXICAL_WEIGHT = 0.15;
 
     private final MatchingCorpusService matchingCorpusService;
     private final MatchingTextPreprocessor textPreprocessor;
@@ -62,16 +66,25 @@ public class MatchScorer {
     public ScoredMatch score(PreparedResume prepared, Job job, UserAccount seeker) {
         Objects.requireNonNull(prepared, "prepared");
         MatchingCorpusService.CorpusSnapshot snapshot = prepared.snapshot();
-        String jobText = jobText(job);
         MatchingCorpusService.JobDocument corpusDocument = job == null || job.getId() == null
                 ? null
                 : snapshot.jobs().get(job.getId());
-        List<String> jobTokens = corpusDocument == null
-                ? textPreprocessor.tokenize(jobText)
-                : corpusDocument.tokens();
+        List<String> titleTokens = corpusDocument == null
+                ? textPreprocessor.tokenize(job == null ? "" : job.getTitle())
+                : corpusDocument.titleTokens();
+        List<String> descriptionTokens = corpusDocument == null
+                ? textPreprocessor.tokenize(job == null ? "" : job.getDescription())
+                : corpusDocument.descriptionTokens();
 
-        Bm25Scorer.Result bm25 = Bm25Scorer.score(
-                prepared.tokens(), jobTokens, snapshot.idfByTerm(), snapshot.averageDocumentLength());
+        Set<String> requiredSkills = requiredSkills(job);
+        LexicalResult lexical = lexicalScore(
+                prepared.tokens(),
+                prepared.skills(),
+                requiredSkills,
+                titleTokens,
+                descriptionTokens,
+                snapshot);
+        Bm25Scorer.Result bm25 = lexical.result();
         double embedding = 0.0;
         boolean embeddingAvailable = false;
         double[] jobEmbedding = corpusDocument == null ? null : corpusDocument.embedding();
@@ -83,7 +96,6 @@ public class MatchScorer {
             }
         }
 
-        Set<String> requiredSkills = requiredSkills(job);
         Set<String> resumeSkills = prepared.skills();
         List<String> missingSkills = requiredSkills.stream()
                 .filter(skill -> !resumeSkills.contains(skill))
@@ -92,6 +104,7 @@ public class MatchScorer {
 
         ExperienceResult experience = experienceScore(seeker, job);
         LocationResult location = locationScore(seeker, job);
+        SalaryResult salary = salaryScore(seeker, job);
         double weightedTotal = 0.0;
         double activeWeight = 0.0;
         if (bm25.available()) {
@@ -110,6 +123,10 @@ public class MatchScorer {
             weightedTotal += location.value() * LOCATION_WEIGHT;
             activeWeight += LOCATION_WEIGHT;
         }
+        if (salary.available()) {
+            weightedTotal += salary.value() * SALARY_WEIGHT;
+            activeWeight += SALARY_WEIGHT;
+        }
         double overall = activeWeight == 0.0 ? 0.0 : clamp01(weightedTotal / activeWeight);
         boolean strongMatch = overall >= STRONG_MATCH_THRESHOLD && activeWeight > 0.0;
         return new ScoredMatch(
@@ -119,10 +136,13 @@ public class MatchScorer {
                         embedding,
                         experience.value(),
                         location.value(),
+                        salary.value(),
                         bm25.available(),
                         embeddingAvailable,
                         experience.available(),
-                        location.available()),
+                        location.available(),
+                        salary.available(),
+                        lexical.breakdown()),
                 missingSkills,
                 strongMatch);
     }
@@ -136,7 +156,7 @@ public class MatchScorer {
             return Set.of();
         }
         return job.getRequiredSkills().stream()
-                .map(skill -> skill == null ? null : skill.getName())
+                .map(skill -> skill == null ? "" : skill.getName())
                 .map(skillCatalog::canonicalize)
                 .filter(value -> !value.isEmpty())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -152,9 +172,50 @@ public class MatchScorer {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private String jobText(Job job) {
-        return (job == null || job.getTitle() == null ? "" : job.getTitle())
-                + " " + (job == null || job.getDescription() == null ? "" : job.getDescription());
+    private LexicalResult lexicalScore(
+            List<String> resumeTokens,
+            Set<String> resumeSkills,
+            Set<String> requiredSkills,
+            List<String> titleTokens,
+            List<String> descriptionTokens,
+            MatchingCorpusService.CorpusSnapshot snapshot) {
+        boolean requiredSkillsAvailable = !requiredSkills.isEmpty();
+        double requiredSkillCoverage = requiredSkillsAvailable
+                ? requiredSkills.stream().filter(resumeSkills::contains).count() / (double) requiredSkills.size()
+                : 0.0;
+
+        Bm25Scorer.Result title = Bm25Scorer.score(
+                resumeTokens, titleTokens, snapshot.idfByTerm(), snapshot.averageTitleLength());
+        Bm25Scorer.Result description = Bm25Scorer.score(
+                resumeTokens, descriptionTokens, snapshot.idfByTerm(), snapshot.averageDescriptionLength());
+
+        double weightedTotal = 0.0;
+        double activeWeight = 0.0;
+        if (requiredSkillsAvailable) {
+            weightedTotal += requiredSkillCoverage * REQUIRED_SKILLS_LEXICAL_WEIGHT;
+            activeWeight += REQUIRED_SKILLS_LEXICAL_WEIGHT;
+        }
+        if (title.available()) {
+            weightedTotal += title.value() * TITLE_LEXICAL_WEIGHT;
+            activeWeight += TITLE_LEXICAL_WEIGHT;
+        }
+        if (description.available()) {
+            weightedTotal += description.value() * DESCRIPTION_LEXICAL_WEIGHT;
+            activeWeight += DESCRIPTION_LEXICAL_WEIGHT;
+        }
+
+        Bm25Scorer.Result result = activeWeight == 0.0
+                ? new Bm25Scorer.Result(0.0, false)
+                : new Bm25Scorer.Result(clamp01(weightedTotal / activeWeight), true);
+        return new LexicalResult(
+                result,
+                new MatchFactorBreakdown.LexicalBreakdown(
+                        requiredSkillCoverage,
+                        title.value(),
+                        description.value(),
+                        requiredSkillsAvailable,
+                        title.available(),
+                        description.available()));
     }
 
     private Double cosine(double[] left, double[] right) {
@@ -203,6 +264,21 @@ public class MatchScorer {
         return new LocationResult(matches ? 1.0 : 0.0, true);
     }
 
+    private SalaryResult salaryScore(UserAccount seeker, Job job) {
+        Integer preferredMin = seeker == null ? null : seeker.getPreferredSalaryMin();
+        Integer preferredMax = seeker == null ? null : seeker.getPreferredSalaryMax();
+        Integer jobMin = job == null ? null : job.getSalaryMin();
+        Integer jobMax = job == null ? null : job.getSalaryMax();
+        if (preferredMin == null && preferredMax == null || jobMin == null && jobMax == null) {
+            return new SalaryResult(0.0, false);
+        }
+
+        boolean seekerMinimumExceedsJobMaximum = preferredMin != null
+                && jobMax != null
+                && preferredMin > jobMax;
+        return new SalaryResult(seekerMinimumExceedsJobMaximum ? 0.0 : 1.0, true);
+    }
+
     private double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, value));
     }
@@ -211,6 +287,14 @@ public class MatchScorer {
     }
 
     private record LocationResult(double value, boolean available) {
+    }
+
+    private record SalaryResult(double value, boolean available) {
+    }
+
+    private record LexicalResult(
+            Bm25Scorer.Result result,
+            MatchFactorBreakdown.LexicalBreakdown breakdown) {
     }
 
     public record PreparedResume(

@@ -202,30 +202,36 @@ export default function JobDetailPage() {
             {job.description}
           </p>
 
-          <Divider label="Required skills" />
+          <Divider label="Skills used for matching" />
           <div style={{ marginTop: "1rem" }}>
             {job.requiredSkills.length === 0 ? (
               <p style={{ fontSize: "0.875rem", color: "var(--ink-muted)" }}>
-                No specific skills were listed for this role.
+                No skills were detected or added for this role.
               </p>
             ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
-                {job.requiredSkills.map((skill) => (
-                  <span
-                    key={skill}
-                    style={{
-                      padding: "0.25rem 0.625rem",
-                      background: "var(--accent-faint)",
-                      color: "var(--accent)",
-                      borderRadius: "999px",
-                      fontSize: "0.8125rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+              <>
+                <p style={{ fontSize: "0.875rem", color: "var(--ink-muted)", marginBottom: "0.75rem" }}>
+                  Skills detected from the title and description, plus any requirements added by the employer.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                  {job.requiredSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      style={{
+                        padding: "0.35rem 0.65rem",
+                        background: "var(--accent-faint)",
+                        color: "var(--accent)",
+                        border: "1px solid var(--accent-faint)",
+                        borderRadius: "var(--radius-sm)",
+                        fontSize: "0.8125rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 

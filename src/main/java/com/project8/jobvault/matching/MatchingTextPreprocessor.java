@@ -15,6 +15,6 @@ public class MatchingTextPreprocessor {
     }
 
     public List<String> tokenize(String text) {
-        return tokenizer.tokenizeWithBigrams(skillCatalog.canonicalizeText(text));
+        return tokenizer.tokenize(skillCatalog.canonicalizeText(text));
     }
 }

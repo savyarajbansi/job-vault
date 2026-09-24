@@ -131,6 +131,8 @@ public class SeekerPublicProfileController {
                 user.getPreferredLocation(),
                 user.getWorkMode(),
                 user.getYearsExperience(),
+                user.getPreferredSalaryMin(),
+                user.getPreferredSalaryMax(),
                 current);
     }
 

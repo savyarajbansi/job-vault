@@ -84,6 +84,8 @@ public class DjlEmbeddingService implements EmbeddingService {
                     .optEngine("OnnxRuntime")
                     .optTranslatorFactory(new TextEmbeddingTranslatorFactory())
                     .optArgument("maxLength", maxTokenLength)
+                    // The exported BERT graph keeps token_type_ids as an input.
+                    .optArgument("includeTokenTypes", true)
                     .build();
             ZooModel<String, float[]> model = criteria.loadModel();
             predictor = model.newPredictor();

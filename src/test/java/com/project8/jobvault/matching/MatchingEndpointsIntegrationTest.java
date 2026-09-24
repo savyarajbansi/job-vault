@@ -46,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration",
+        "jobvault.matching.embedding.enabled=false",
         "jobvault.security.jwt.secret=unit-test-secret-should-be-at-least-32-bytes-long",
         "jobvault.security.jwt.refresh-hash-secret=unit-test-refresh-secret-should-be-at-least-32-bytes-long",
         "jobvault.security.jwt.issuer=jobvault-test",
@@ -203,11 +204,15 @@ class MatchingEndpointsIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + issueToken(seekerUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].jobId").value(strongMatchJob.getId().toString()))
-                .andExpect(jsonPath("$.items[0].strongMatch").value(false))
+                .andExpect(jsonPath("$.items[0].strongMatch").value(true))
                 .andExpect(jsonPath("$.items[0].missingSkills[0]").value("kubernetes"))
                 .andExpect(jsonPath("$.items[0].factors.bm25").isNumber())
                 .andExpect(jsonPath("$.items[0].factors.embedding").value(0.0))
                 .andExpect(jsonPath("$.items[0].factors.bm25Available").value(true))
+                .andExpect(jsonPath("$.items[0].factors.lexical.requiredSkills").isNumber())
+                .andExpect(jsonPath("$.items[0].factors.lexical.title").isNumber())
+                .andExpect(jsonPath("$.items[0].factors.lexical.description").isNumber())
+                .andExpect(jsonPath("$.items[0].factors.lexical.requiredSkillsAvailable").isBoolean())
                 .andExpect(jsonPath("$.items[0].factors.embeddingAvailable").value(false))
                 .andExpect(jsonPath("$.items[0].factors.cosine").doesNotExist())
                 .andExpect(jsonPath("$.items[0].factors.skillsOverlap").doesNotExist())

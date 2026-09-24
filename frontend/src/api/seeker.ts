@@ -1,7 +1,7 @@
 import { authorizedRequest } from "./auth";
 import type { ApplicationStatus, EducationRequirement } from "./employer";
 import { authorizedBlobRequest } from "./auth";
-import type { SectorCode, WorkMode } from "./matching";
+import type { NepalCity, SectorCode, WorkMode } from "./matching";
 
 export type ResumeUploadResult = {
   resumeId: string;
@@ -27,10 +27,20 @@ export type MatchFactors = {
   embedding: number;
   experience: number;
   location: number;
+  salary: number;
   bm25Available: boolean;
   embeddingAvailable: boolean;
   experienceAvailable: boolean;
   locationAvailable: boolean;
+  salaryAvailable: boolean;
+  lexical: {
+    requiredSkills: number;
+    title: number;
+    description: number;
+    requiredSkillsAvailable: boolean;
+    titleAvailable: boolean;
+    descriptionAvailable: boolean;
+  };
 };
 
 // Mirrors SeekerJobMatchResponse.JobInfo on the backend. Keep in sync with
@@ -76,18 +86,22 @@ export type SeekerProfile = {
   displayName: string | null;
   email: string;
   preferredSectors: SectorCode[];
-  preferredLocation: string | null;
+  preferredLocation: NepalCity | string | null;
   workMode: WorkMode | null;
   yearsExperience: number | null;
+  preferredSalaryMin: number | null;
+  preferredSalaryMax: number | null;
   resume: CurrentResume | null;
 };
 
 export type SeekerProfileUpdate = {
   displayName?: string | null;
   preferredSectors?: SectorCode[] | null;
-  preferredLocation?: string | null;
+  preferredLocation?: NepalCity | null;
   workMode?: WorkMode | null;
   yearsExperience?: number | null;
+  preferredSalaryMin?: number | null;
+  preferredSalaryMax?: number | null;
   skills?: string[] | null;
 };
 

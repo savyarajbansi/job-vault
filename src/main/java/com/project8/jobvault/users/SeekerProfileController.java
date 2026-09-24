@@ -1,6 +1,7 @@
 package com.project8.jobvault.users;
 
 import com.project8.jobvault.matching.MatchingPreferences;
+import com.project8.jobvault.matching.NepalCity;
 import com.project8.jobvault.matching.SectorCode;
 import com.project8.jobvault.parsing.SkillCatalog;
 import com.project8.jobvault.resumes.ResumeMetadata;
@@ -58,9 +59,11 @@ public class SeekerProfileController {
         Objects.requireNonNull(request, "request");
         user.setDisplayName(normalizeDisplayName(request.displayName()));
         user.setPreferredSectors(normalizeSectors(request.preferredSectors()));
-        user.setPreferredLocation(normalizeText(request.preferredLocation()));
+        user.setPreferredLocation(normalizeLocation(request.preferredLocation()));
         user.setWorkMode(request.workMode());
         user.setYearsExperience(request.yearsExperience());
+        user.setPreferredSalaryMin(request.preferredSalaryMin());
+        user.setPreferredSalaryMax(request.preferredSalaryMax());
 
         ResumeMetadata resume = resumeMetadataRepository.findBySeekerId(user.getId()).orElse(null);
         if (resume != null && request.skills() != null) {
@@ -87,6 +90,8 @@ public class SeekerProfileController {
                 user.getPreferredLocation(),
                 user.getWorkMode(),
                 user.getYearsExperience(),
+                user.getPreferredSalaryMin(),
+                user.getPreferredSalaryMax(),
                 current);
     }
 
@@ -137,6 +142,14 @@ public class SeekerProfileController {
 
     private String normalizeDisplayName(String value) {
         return normalizeText(value);
+    }
+
+    private String normalizeLocation(String value) {
+        try {
+            return NepalCity.normalize(value);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
     }
 
     private String normalizeText(String value) {

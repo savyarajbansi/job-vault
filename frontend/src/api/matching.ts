@@ -12,6 +12,41 @@ export type SectorCode =
 
 export type WorkMode = "ON_SITE" | "REMOTE" | "HYBRID";
 
+export type NepalCity =
+  | "Kathmandu"
+  | "Lalitpur"
+  | "Bhaktapur"
+  | "Pokhara"
+  | "Bharatpur"
+  | "Biratnagar"
+  | "Birgunj"
+  | "Butwal"
+  | "Dharan"
+  | "Hetauda"
+  | "Janakpur"
+  | "Nepalgunj"
+  | "Dhangadhi"
+  | "Itahari"
+  | "Tulsipur";
+
+export const NEPAL_CITY_OPTIONS: Array<{ value: NepalCity; label: string }> = [
+  { value: "Kathmandu", label: "Kathmandu" },
+  { value: "Lalitpur", label: "Lalitpur" },
+  { value: "Bhaktapur", label: "Bhaktapur" },
+  { value: "Pokhara", label: "Pokhara" },
+  { value: "Bharatpur", label: "Bharatpur" },
+  { value: "Biratnagar", label: "Biratnagar" },
+  { value: "Birgunj", label: "Birgunj" },
+  { value: "Butwal", label: "Butwal" },
+  { value: "Dharan", label: "Dharan" },
+  { value: "Hetauda", label: "Hetauda" },
+  { value: "Janakpur", label: "Janakpur" },
+  { value: "Nepalgunj", label: "Nepalgunj" },
+  { value: "Dhangadhi", label: "Dhangadhi" },
+  { value: "Itahari", label: "Itahari" },
+  { value: "Tulsipur", label: "Tulsipur" },
+];
+
 export const SECTOR_OPTIONS: Array<{ value: SectorCode; label: string }> = [
   { value: "BUSINESS", label: "Business" },
   { value: "HEALTHCARE", label: "Healthcare" },

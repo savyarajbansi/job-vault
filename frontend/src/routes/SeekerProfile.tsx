@@ -7,8 +7,13 @@ import {
   uploadSeekerResume,
 } from "../api/seeker";
 import type { SeekerProfile } from "../api/seeker";
-import type { SectorCode, WorkMode } from "../api/matching";
-import { SECTOR_OPTIONS, WORK_MODE_LABELS } from "../api/matching";
+import type { NepalCity, SectorCode, WorkMode } from "../api/matching";
+import {
+  NEPAL_CITY_OPTIONS,
+  SECTOR_OPTIONS,
+  WORK_MODE_LABELS,
+} from "../api/matching";
+import { formatSalaryRange } from "../api/employer";
 import {
   Alert,
   Badge,
@@ -63,6 +68,12 @@ function ProfileForm({
   const [location, setLocation] = useState(profile.preferredLocation ?? "");
   const [workMode, setWorkMode] = useState<WorkMode | "">(profile.workMode ?? "");
   const [years, setYears] = useState(profile.yearsExperience == null ? "" : String(profile.yearsExperience));
+  const [salaryMin, setSalaryMin] = useState(
+    profile.preferredSalaryMin == null ? "" : String(profile.preferredSalaryMin)
+  );
+  const [salaryMax, setSalaryMax] = useState(
+    profile.preferredSalaryMax == null ? "" : String(profile.preferredSalaryMax)
+  );
   const [skills, setSkills] = useState(profile.resume?.skills ?? []);
   const [newSkill, setNewSkill] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -84,14 +95,40 @@ function ProfileForm({
       setError("Years of experience must be between 0 and 60.");
       return;
     }
+    const parsedSalaryMin = salaryMin.trim() === "" ? null : Number(salaryMin);
+    const parsedSalaryMax = salaryMax.trim() === "" ? null : Number(salaryMax);
+    if (
+      (parsedSalaryMin !== null && (!Number.isInteger(parsedSalaryMin) || parsedSalaryMin < 0)) ||
+      (parsedSalaryMax !== null && (!Number.isInteger(parsedSalaryMax) || parsedSalaryMax < 0))
+    ) {
+      setError("Preferred salary must use non-negative whole numbers.");
+      return;
+    }
+    if (
+      parsedSalaryMin !== null &&
+      parsedSalaryMax !== null &&
+      parsedSalaryMax < parsedSalaryMin
+    ) {
+      setError("Maximum preferred salary must be greater than or equal to minimum preferred salary.");
+      return;
+    }
+    const selectedLocation = NEPAL_CITY_OPTIONS.some((option) => option.value === location)
+      ? (location as NepalCity)
+      : null;
+    if (location && selectedLocation === null) {
+      setError("Select a supported Nepal city from the location list.");
+      return;
+    }
     onSavingChange(true);
     try {
       const updated = await updateSeekerProfile({
         displayName: displayName.trim() || null,
         preferredSectors: sectors,
-        preferredLocation: location.trim() || null,
+        preferredLocation: selectedLocation,
         workMode: workMode || null,
         yearsExperience: parsedYears,
+        preferredSalaryMin: parsedSalaryMin,
+        preferredSalaryMax: parsedSalaryMax,
         skills,
       });
       onSaved(updated);
@@ -134,13 +171,22 @@ function ProfileForm({
             ))}
           </div>
         </fieldset>
-        <Input
-          label="Preferred location"
-          value={location}
-          onChange={(event) => setLocation(event.target.value)}
-          maxLength={150}
-          placeholder="e.g. Kathmandu"
-        />
+        <label style={{ display: "grid", gap: "0.375rem", fontSize: "0.8125rem", fontWeight: 500 }}>
+          Preferred location
+          <select
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}
+          >
+            <option value="">Not specified</option>
+            {location && !NEPAL_CITY_OPTIONS.some((option) => option.value === location) && (
+              <option value={location} disabled>{location} (legacy value)</option>
+            )}
+            {NEPAL_CITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
         <label style={{ display: "grid", gap: "0.375rem", fontSize: "0.8125rem", fontWeight: 500 }}>
           Work preference
           <select value={workMode} onChange={(event) => setWorkMode(event.target.value as WorkMode | "")} style={{ padding: "0.65rem 0.75rem", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--bg-card)", color: "var(--ink)" }}>
@@ -157,6 +203,34 @@ function ProfileForm({
           onChange={(event) => setYears(event.target.value)}
           placeholder="e.g. 3"
         />
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend style={{ fontSize: "0.8125rem", fontWeight: 500, marginBottom: "0.375rem" }}>
+            Preferred salary range (USD)
+          </legend>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem" }}>
+            <Input
+              id="preferred-salary-min"
+              label="Minimum"
+              type="number"
+              min={0}
+              value={salaryMin}
+              onChange={(event) => setSalaryMin(event.target.value)}
+              placeholder="80000"
+            />
+            <Input
+              id="preferred-salary-max"
+              label="Maximum"
+              type="number"
+              min={0}
+              value={salaryMax}
+              onChange={(event) => setSalaryMax(event.target.value)}
+              placeholder="120000"
+            />
+          </div>
+          <p style={{ color: "var(--ink-muted)", fontSize: "0.75rem", margin: "0.45rem 0 0" }}>
+            Leave either field blank if you do not want to set a salary preference.
+          </p>
+        </fieldset>
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend style={{ fontSize: "0.8125rem", fontWeight: 500, marginBottom: "0.375rem" }}>Parsed skills</legend>
           {profile.resume ? (
@@ -309,6 +383,7 @@ export default function SeekerProfile() {
                 <div><dt>Location</dt><dd>{profile.preferredLocation || "Not set"}</dd></div>
                 <div><dt>Work preference</dt><dd>{profile.workMode ? WORK_MODE_LABELS[profile.workMode] : "Not specified"}</dd></div>
                 <div><dt>Experience</dt><dd>{profile.yearsExperience == null ? "Not set" : `${profile.yearsExperience} year${profile.yearsExperience === 1 ? "" : "s"}`}</dd></div>
+                <div><dt>Preferred salary</dt><dd>{formatSalaryRange(profile.preferredSalaryMin, profile.preferredSalaryMax) ?? "Not set"}</dd></div>
               </dl>
             </section>
             <section>

@@ -1,5 +1,5 @@
 import { authorizedRequest } from "./auth";
-import type { SectorCode, WorkMode } from "./matching";
+import type { NepalCity, SectorCode, WorkMode } from "./matching";
 
 export type JobStatus = "DRAFT" | "ACTIVE" | "DISABLED";
 
@@ -21,7 +21,7 @@ export type JobSummary = {
   title: string;
   companyName: string | null;
   sectorTags: SectorCode[];
-  location: string | null;
+  location: NepalCity | string | null;
   workMode: WorkMode | null;
   minExperienceYears: number | null;
   salaryMin: number | null;
@@ -36,7 +36,7 @@ export type JobDetail = {
   description: string;
   companyName: string | null;
   sectorTags: SectorCode[];
-  location: string | null;
+  location: NepalCity | string | null;
   workMode: WorkMode | null;
   minExperienceYears: number | null;
   salaryMin: number | null;
@@ -55,7 +55,7 @@ export type JobCreateRequest = {
   description: string;
   companyName?: string | null;
   sectorTags?: SectorCode[] | null;
-  location?: string | null;
+  location?: NepalCity | null;
   workMode?: WorkMode | null;
   minExperienceYears?: number | null;
   salaryMin?: number | null;
